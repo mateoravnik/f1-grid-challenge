@@ -3,7 +3,6 @@ import { getF1Data } from '@/lib/f1Data';
 import { generateDailyGrid } from '@/lib/gridGenerator';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 export async function GET() {
   try {

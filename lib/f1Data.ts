@@ -51,7 +51,7 @@ export const SPECIAL_CONDITIONS = [
 ];
 
 async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetch(url, { next: { revalidate: 21600 } });
+  const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
   return res.json();
 }

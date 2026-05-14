@@ -76,7 +76,6 @@ export function generateDailyGrid(
 ): DailyGrid {
   const dateKey = getDateKey(date);
   const baseSeed = dateSeed(date);
-  const rng = seededRng(baseSeed);
 
   // Build condition pool: all constructors + all special conditions
   const constructorConditions: ConditionDef[] = CONSTRUCTOR_POOL.map((c) => ({

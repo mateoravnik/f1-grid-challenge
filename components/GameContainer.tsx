@@ -117,7 +117,7 @@ export default function GameContainer() {
         setGameState(initialState);
         if (saved?.finished) setShowResult(true);
       })
-      .catch((e: Error) => setError(e.message))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Error desconocido'))
       .finally(() => setLoading(false));
   }, []);
 

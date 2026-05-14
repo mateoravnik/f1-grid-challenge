@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { DriverListItem } from './GameContainer';
 
 interface Props {
@@ -52,7 +52,7 @@ export default function InputModal({ rowLabel, colLabel, driverList, usedDriverI
     onSubmit(driver.id);
   }, [onSubmit]);
 
-  const handleKey = (e: React.KeyboardEvent) => {
+  const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Escape') { onClose(); return; }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -64,11 +64,10 @@ export default function InputModal({ rowLabel, colLabel, driverList, usedDriverI
     }
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (selected >= 0 && suggestions[selected]) {
-        handleSubmit(suggestions[selected]);
-      } else if (suggestions.length === 1) {
-        handleSubmit(suggestions[0]);
-      }
+      const target = selected >= 0 ? suggestions[selected] : undefined;
+      const only = suggestions.length === 1 ? suggestions[0] : undefined;
+      const chosen = target ?? only;
+      if (chosen) handleSubmit(chosen);
     }
   };
 

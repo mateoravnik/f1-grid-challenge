@@ -12,7 +12,7 @@ interface Props {
   onClose: () => void;
 }
 
-function buildShareText(gameState: GameState, grid: DailyGrid): string {
+function buildShareText(gameState: GameState): string {
   const { cells, attemptsLeft, dateKey } = gameState;
   const used = 9 - attemptsLeft;
   const correct = cells.flat().filter((c) => c.status === 'correct').length;
@@ -37,7 +37,7 @@ export default function ResultScreen({ gameState, grid, driverLookup, streak, on
   const used = 9 - attemptsLeft;
   const perfect = correct === 9;
 
-  const shareText = buildShareText(gameState, grid);
+  const shareText = buildShareText(gameState);
 
   const handleShare = () => {
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
