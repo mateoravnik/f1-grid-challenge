@@ -1,9 +1,31 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import ModeSelect from './ModeSelect';
 import GameBoard from './GameBoard';
-import ResultScreen from './ResultScreen';
 import type { DailyGrid } from '@/lib/gridGenerator';
+
+// ---------------------------------------------------------------------------
+// Shared types
+// ---------------------------------------------------------------------------
+export type Player = 'X' | 'O';
+export type GameMode = 'friend' | 'ai';
+
+export interface CellEntry {
+  player: Player;
+  driverId: string;
+}
+
+export interface TicTacToeState {
+  mode: GameMode;
+  board: (CellEntry | null)[][];
+  currentPlayer: Player;
+  usedDriverIds: Set<string>;
+  winner: Player | 'draw' | null;
+  winLine: [number, number][] | null;
+  aiThinking: boolean;
+  shakeCell: [number, number] | null;
+}
 
 export interface DriverLookup {
   fullName: string;
@@ -25,214 +47,266 @@ export interface GameData {
   driverList: DriverListItem[];
 }
 
-export type CellState = {
-  status: 'empty' | 'correct' | 'wrong';
-  driverId?: string;
-  shake?: boolean;
-};
+// ---------------------------------------------------------------------------
+// Win detection
+// ---------------------------------------------------------------------------
+const WIN_LINES: [number, number][][] = [
+  [[0,0],[0,1],[0,2]],
+  [[1,0],[1,1],[1,2]],
+  [[2,0],[2,1],[2,2]],
+  [[0,0],[1,0],[2,0]],
+  [[0,1],[1,1],[2,1]],
+  [[0,2],[1,2],[2,2]],
+  [[0,0],[1,1],[2,2]],
+  [[0,2],[1,1],[2,0]],
+];
 
-export interface GameState {
-  cells: CellState[][];
-  attemptsLeft: number;
-  usedDriverIds: Set<string>;
-  finished: boolean;
-  dateKey: string;
+function checkWinner(board: (CellEntry | null)[][]): { winner: Player; line: [number, number][] } | null {
+  for (const line of WIN_LINES) {
+    const [a, b, c] = line as [[number,number],[number,number],[number,number]];
+    const pa = board[a[0]][a[1]]?.player;
+    const pb = board[b[0]][b[1]]?.player;
+    const pc = board[c[0]][c[1]]?.player;
+    if (pa && pa === pb && pa === pc) {
+      return { winner: pa, line: [a, b, c] };
+    }
+  }
+  return null;
 }
 
-const MAX_ATTEMPTS = 9;
+function boardFull(board: (CellEntry | null)[][]): boolean {
+  return board.every(row => row.every(cell => cell !== null));
+}
 
-function initCells(): CellState[][] {
-  return Array.from({ length: 3 }, () =>
-    Array.from({ length: 3 }, () => ({ status: 'empty' as const }))
+function emptyBoard(): (CellEntry | null)[][] {
+  return Array.from({ length: 3 }, () => Array(3).fill(null));
+}
+
+// ---------------------------------------------------------------------------
+// AI logic
+// ---------------------------------------------------------------------------
+interface AiMove { row: number; col: number; driverId: string }
+
+function findAiMove(state: TicTacToeState, grid: DailyGrid): AiMove | null {
+  type CandidateCell = { row: number; col: number; drivers: string[] };
+  const candidates: CandidateCell[] = [];
+
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      if (state.board[r][c]) continue;
+      const valid = (grid.cells[r]?.[c]?.validDriverIds ?? []).filter(
+        id => !state.usedDriverIds.has(id)
+      );
+      if (valid.length > 0) candidates.push({ row: r, col: c, drivers: valid });
+    }
+  }
+
+  if (candidates.length === 0) return null;
+
+  const pick = (cell: CandidateCell): AiMove => ({
+    row: cell.row,
+    col: cell.col,
+    driverId: cell.drivers[Math.floor(Math.random() * cell.drivers.length)],
+  });
+
+  const simWins = (player: Player): CandidateCell | undefined =>
+    candidates.find(({ row, col }) => {
+      const sim = state.board.map(r => [...r]);
+      sim[row][col] = { player, driverId: '' };
+      return checkWinner(sim as (CellEntry | null)[][])?.winner === player;
+    });
+
+  const winning = simWins('O');
+  if (winning) return pick(winning);
+
+  const blocking = simWins('X');
+  if (blocking) return pick(blocking);
+
+  const center = candidates.find(m => m.row === 1 && m.col === 1);
+  if (center) return pick(center);
+
+  const corners = candidates.filter(m => (m.row !== 1 || m.col !== 1) && (m.row + m.col) % 2 === 0);
+  if (corners.length > 0) return pick(corners[Math.floor(Math.random() * corners.length)]);
+
+  return pick(candidates[Math.floor(Math.random() * candidates.length)]);
+}
+
+// ---------------------------------------------------------------------------
+// Apply a confirmed correct move
+// ---------------------------------------------------------------------------
+function applyMove(state: TicTacToeState, row: number, col: number, driverId: string): TicTacToeState {
+  const newBoard = state.board.map((r, ri) =>
+    r.map((c, ci) =>
+      ri === row && ci === col ? { player: state.currentPlayer, driverId } : c
+    )
   );
+  const newUsed = new Set(state.usedDriverIds);
+  newUsed.add(driverId);
+  const winResult = checkWinner(newBoard as (CellEntry | null)[][]);
+  const full = boardFull(newBoard as (CellEntry | null)[][]);
+
+  return {
+    ...state,
+    board: newBoard as (CellEntry | null)[][],
+    usedDriverIds: newUsed,
+    currentPlayer: state.currentPlayer === 'X' ? 'O' : 'X',
+    winner: winResult ? winResult.winner : full ? 'draw' : null,
+    winLine: winResult ? winResult.line : null,
+    aiThinking: false,
+    shakeCell: null,
+  };
 }
 
-function loadGameState(dateKey: string): GameState | null {
-  try {
-    const raw = localStorage.getItem(`f1gc-${dateKey}`);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return {
-      ...parsed,
-      usedDriverIds: new Set(parsed.usedDriverIds ?? []),
-    };
-  } catch { return null; }
-}
-
-function saveGameState(state: GameState) {
-  try {
-    const toSave = {
-      ...state,
-      usedDriverIds: Array.from(state.usedDriverIds),
-    };
-    localStorage.setItem(`f1gc-${state.dateKey}`, JSON.stringify(toSave));
-  } catch { /* ignore */ }
-}
-
-function loadStreak(): number {
-  try {
-    const raw = localStorage.getItem('f1gc-streak');
-    if (!raw) return 0;
-    const { streak, lastDate } = JSON.parse(raw);
-    const today = new Date();
-    const todayKey = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, '0')}-${String(today.getUTCDate()).padStart(2, '0')}`;
-    const yesterday = new Date(today);
-    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-    const yKey = `${yesterday.getUTCFullYear()}-${String(yesterday.getUTCMonth() + 1).padStart(2, '0')}-${String(yesterday.getUTCDate()).padStart(2, '0')}`;
-    if (lastDate === todayKey || lastDate === yKey) return streak;
-    return 0;
-  } catch { return 0; }
-}
-
-function saveStreak(streak: number, dateKey: string) {
-  try {
-    localStorage.setItem('f1gc-streak', JSON.stringify({ streak, lastDate: dateKey }));
-  } catch { /* ignore */ }
-}
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+type AppPhase = 'loading' | 'error' | 'mode-select' | 'playing';
 
 export default function GameContainer() {
-  const [gameData, setGameData] = useState<GameData | null>(null);
+  const [phase, setPhase] = useState<AppPhase>('loading');
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [gameState, setGameState] = useState<GameState | null>(null);
-  const [streak, setStreak] = useState(0);
-  const [showResult, setShowResult] = useState(false);
+  const [gameData, setGameData] = useState<GameData | null>(null);
+  const [tttState, setTttState] = useState<TicTacToeState | null>(null);
+  const shakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Fetch grid data on mount
   useEffect(() => {
-    setStreak(loadStreak());
     fetch('/api/f1-data')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) throw new Error(data.error);
-        setGameData(data as GameData);
-        const dateKey = (data as GameData).grid.dateKey;
-        const saved = loadGameState(dateKey);
-        const initialState: GameState = saved ?? {
-          cells: initCells(),
-          attemptsLeft: MAX_ATTEMPTS,
-          usedDriverIds: new Set(),
-          finished: false,
-          dateKey,
-        };
-        setGameState(initialState);
-        if (saved?.finished) setShowResult(true);
+      .then(r => r.json())
+      .then((data: unknown) => {
+        const d = data as { error?: string } & GameData;
+        if (d.error) throw new Error(d.error);
+        setGameData(d);
+        setPhase('mode-select');
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Error desconocido'))
-      .finally(() => setLoading(false));
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : 'Error al cargar datos');
+        setPhase('error');
+      });
+
+    return () => {
+      if (shakeTimerRef.current) clearTimeout(shakeTimerRef.current);
+      if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+    };
+  }, []);
+
+  // AI turn effect
+  useEffect(() => {
+    if (!tttState || !gameData) return;
+    if (tttState.winner !== null) return;
+    if (tttState.mode !== 'ai') return;
+    if (tttState.currentPlayer !== 'O') return;
+    if (tttState.aiThinking) return;
+
+    // Snapshot for the closure
+    const snap = tttState;
+    const grid = gameData.grid;
+
+    setTttState(prev => prev ? { ...prev, aiThinking: true } : prev);
+
+    aiTimerRef.current = setTimeout(() => {
+      const move = findAiMove(snap, grid);
+      setTttState(prev => {
+        if (!prev) return prev;
+        if (!move) {
+          // No valid cell for AI — pass turn back to player
+          return { ...prev, aiThinking: false, currentPlayer: 'X' };
+        }
+        return applyMove(prev, move.row, move.col, move.driverId);
+      });
+    }, 1200);
+
+    return () => {
+      if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tttState?.currentPlayer, tttState?.winner, tttState?.aiThinking, tttState?.mode]);
+
+  const startGame = useCallback((mode: GameMode) => {
+    setTttState({
+      mode,
+      board: emptyBoard(),
+      currentPlayer: 'X',
+      usedDriverIds: new Set(),
+      winner: null,
+      winLine: null,
+      aiThinking: false,
+      shakeCell: null,
+    });
+    setPhase('playing');
   }, []);
 
   const handleAnswer = useCallback((row: number, col: number, driverId: string) => {
-    if (!gameData || !gameState) return;
-    const cell = gameData.grid.cells[row][col];
-    const isValid = cell.validDriverIds.includes(driverId);
-    const alreadyUsed = gameState.usedDriverIds.has(driverId);
-    const alreadyFilled = gameState.cells[row][col].status === 'correct';
+    if (!gameData || !tttState) return;
+    if (tttState.winner !== null) return;
+    if (tttState.board[row][col]) return;
 
-    if (alreadyFilled) return;
+    const cellValidIds = gameData.grid.cells[row]?.[col]?.validDriverIds ?? [];
+    const isValid = cellValidIds.includes(driverId) && !tttState.usedDriverIds.has(driverId);
 
-    if (isValid && !alreadyUsed) {
-      // Correct answer
-      const newCells = gameState.cells.map((r, ri) =>
-        r.map((c, ci) =>
-          ri === row && ci === col
-            ? { status: 'correct' as const, driverId }
-            : c
-        )
-      );
-      const newUsed = new Set(gameState.usedDriverIds);
-      newUsed.add(driverId);
-      const newAttempts = gameState.attemptsLeft - 1;
-      const correctCount = newCells.flat().filter((c) => c.status === 'correct').length;
-      const finished = correctCount === 9 || newAttempts === 0;
-
-      const newState: GameState = {
-        ...gameState,
-        cells: newCells,
-        attemptsLeft: newAttempts,
-        usedDriverIds: newUsed,
-        finished,
-      };
-      setGameState(newState);
-      saveGameState(newState);
-
-      if (finished) {
-        const newStreak = correctCount === 9 ? streak + 1 : streak;
-        setStreak(newStreak);
-        saveStreak(newStreak, gameState.dateKey);
-        setTimeout(() => setShowResult(true), 600);
-      }
+    if (isValid) {
+      setTttState(prev => prev ? applyMove(prev, row, col, driverId) : prev);
     } else {
-      // Wrong answer — shake and decrement
-      const newAttempts = gameState.attemptsLeft - 1;
-      const shakeCells = gameState.cells.map((r, ri) =>
-        r.map((c, ci) => ri === row && ci === col ? { ...c, shake: true } : c)
-      );
-      setGameState((prev) => prev ? { ...prev, cells: shakeCells, attemptsLeft: newAttempts } : prev);
-      setTimeout(() => {
-        setGameState((prev) => {
+      // Wrong answer — shake cell, lose turn
+      setTttState(prev => prev ? { ...prev, shakeCell: [row, col] } : prev);
+      shakeTimerRef.current = setTimeout(() => {
+        setTttState(prev => {
           if (!prev) return prev;
-          const cleared = prev.cells.map((r) => r.map((c) => ({ ...c, shake: false })));
-          const finished = newAttempts === 0;
-          const next = { ...prev, cells: cleared, attemptsLeft: newAttempts, finished };
-          saveGameState(next);
-          if (finished) setTimeout(() => setShowResult(true), 300);
-          return next;
+          return { ...prev, shakeCell: null, currentPlayer: prev.currentPlayer === 'X' ? 'O' : 'X' };
         });
-      }, 450);
+      }, 650);
     }
-  }, [gameData, gameState, streak]);
+  }, [gameData, tttState]);
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-6">
-        <div className="text-4xl font-black tracking-tight">
-          <span className="text-[#e10600]">F1</span> GRID CHALLENGE
-        </div>
-        <div className="flex items-center gap-3 text-gray-400">
-          <div className="w-5 h-5 border-2 border-[#e10600] border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-semibold tracking-widest uppercase">Cargando datos F1...</span>
-        </div>
-      </div>
-    );
-  }
+  const handleNewGame = useCallback(() => {
+    if (shakeTimerRef.current) clearTimeout(shakeTimerRef.current);
+    if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+    setTttState(null);
+    setPhase('mode-select');
+  }, []);
 
-  if (error) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
-        <div className="text-4xl">⚠️</div>
-        <div className="text-xl font-bold text-[#e10600]">Error al cargar datos</div>
-        <div className="text-gray-400 max-w-sm">{error}</div>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-2 px-6 py-3 bg-[#e10600] text-white font-bold rounded-lg hover:bg-red-700 transition-colors"
-        >
-          Reintentar
-        </button>
-      </div>
-    );
-  }
+  // ---- Render ----
+  if (phase === 'loading') return <LoadingScreen />;
 
-  if (!gameData || !gameState) return null;
+  if (phase === 'error') return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
+      <div className="text-4xl">⚠️</div>
+      <div className="text-xl font-bold text-[#e10600]">Error al cargar datos</div>
+      <div className="text-gray-400 max-w-sm text-sm">{error}</div>
+      <button
+        onClick={() => window.location.reload()}
+        className="mt-2 px-6 py-3 bg-[#e10600] text-white font-bold rounded-lg hover:bg-red-700 transition-colors"
+      >
+        Reintentar
+      </button>
+    </div>
+  );
+
+  if (phase === 'mode-select') return <ModeSelect onSelect={startGame} />;
+
+  if (!gameData || !tttState) return null;
 
   return (
-    <>
-      {showResult ? (
-        <ResultScreen
-          gameState={gameState}
-          grid={gameData.grid}
-          driverLookup={gameData.driverLookup}
-          streak={streak}
-          onClose={() => setShowResult(false)}
-        />
-      ) : (
-        <GameBoard
-          gameData={gameData}
-          gameState={gameState}
-          streak={streak}
-          onAnswer={handleAnswer}
-          onShowResult={() => setShowResult(true)}
-        />
-      )}
-    </>
+    <GameBoard
+      gameData={gameData}
+      tttState={tttState}
+      onAnswer={handleAnswer}
+      onNewGame={handleNewGame}
+    />
+  );
+}
+
+function LoadingScreen() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-6">
+      <div className="text-4xl font-black tracking-tight">
+        <span className="text-[#e10600]">F1</span> GRID CHALLENGE
+      </div>
+      <div className="flex items-center gap-3 text-gray-400">
+        <div className="w-5 h-5 border-2 border-[#e10600] border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm font-semibold tracking-widest uppercase">Cargando datos F1...</span>
+      </div>
+    </div>
   );
 }

@@ -375,22 +375,30 @@ export function driverMatchesCondition(
   }
 }
 
+// Strip accents + lowercase so "Raikkonen" matches "Räikkönen", "Perez" matches "Pérez", etc.
+export function normalizeText(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
+
 export function searchDrivers(query: string, drivers: Map<string, DriverProfile>): DriverProfile[] {
-  const q = query.toLowerCase().trim();
+  const q = normalizeText(query.trim());
   if (q.length < 2) return [];
   const results: DriverProfile[] = [];
   for (const driver of drivers.values()) {
-    const full = driver.fullName.toLowerCase();
-    const family = driver.familyName.toLowerCase();
-    const given = driver.givenName.toLowerCase();
+    const full = normalizeText(driver.fullName);
+    const family = normalizeText(driver.familyName);
+    const given = normalizeText(driver.givenName);
     if (full.includes(q) || family.startsWith(q) || given.startsWith(q) || family === q) {
       results.push(driver);
     }
   }
   return results
     .sort((a, b) => {
-      const aExact = a.familyName.toLowerCase() === q;
-      const bExact = b.familyName.toLowerCase() === q;
+      const aExact = normalizeText(a.familyName) === q;
+      const bExact = normalizeText(b.familyName) === q;
       if (aExact && !bExact) return -1;
       if (!aExact && bExact) return 1;
       return a.familyName.localeCompare(b.familyName);

@@ -1,106 +1,135 @@
 'use client';
 
 import React, { useState } from 'react';
-import type { GameData, GameState } from './GameContainer';
+import type { GameData, TicTacToeState, Player } from './GameContainer';
 import InputModal from './InputModal';
 
 interface Props {
   gameData: GameData;
-  gameState: GameState;
-  streak: number;
+  tttState: TicTacToeState;
   onAnswer: (row: number, col: number, driverId: string) => void;
-  onShowResult: () => void;
+  onNewGame: () => void;
 }
 
-export default function GameBoard({ gameData, gameState, streak, onAnswer, onShowResult }: Props) {
-  const [activeCell, setActiveCell] = useState<{ row: number; col: number } | null>(null);
+const PLAYER_COLORS: Record<Player, { bg: string; border: string; text: string; ring: string; label: string }> = {
+  X: {
+    bg: 'bg-red-900/70',
+    border: 'border-red-600',
+    text: 'text-[#e10600]',
+    ring: 'ring-2 ring-[#e10600]',
+    label: 'Jugador X',
+  },
+  O: {
+    bg: 'bg-blue-900/70',
+    border: 'border-blue-500',
+    text: 'text-blue-400',
+    ring: 'ring-2 ring-blue-500',
+    label: 'Jugador O',
+  },
+};
 
+export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: Props) {
+  const [activeCell, setActiveCell] = useState<[number, number] | null>(null);
   const { grid, driverLookup, driverList } = gameData;
-  const { cells, attemptsLeft } = gameState;
+  const { board, currentPlayer, winner, winLine, aiThinking, shakeCell, mode } = tttState;
 
-  const correctCount = cells.flat().filter((c) => c.status === 'correct').length;
+  const isAiTurn = mode === 'ai' && currentPlayer === 'O';
+  const gameOver = winner !== null;
+  const colors = PLAYER_COLORS[currentPlayer];
+
+  const winSet = new Set((winLine ?? []).map(([r, c]) => `${r},${c}`));
 
   const handleCellClick = (row: number, col: number) => {
-    if (cells[row][col].status === 'correct') return;
-    if (attemptsLeft === 0) return;
-    setActiveCell({ row, col });
+    if (gameOver || isAiTurn || aiThinking) return;
+    if (board[row][col]) return;
+    setActiveCell([row, col]);
   };
 
-  const handleAnswer = (driverId: string) => {
+  const handleSubmit = (driverId: string) => {
     if (!activeCell) return;
+    const [row, col] = activeCell;
     setActiveCell(null);
-    onAnswer(activeCell.row, activeCell.col, driverId);
+    onAnswer(row, col, driverId);
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen relative">
       {/* Header */}
       <header className="border-b border-[#2a2a2a] px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-2xl sm:text-3xl font-black tracking-tight leading-none">
-              <span className="text-[#e10600]">F1</span>{' '}
-              <span className="text-white">GRID</span>{' '}
-              <span className="text-gray-400">CHALLENGE</span>
-            </div>
+          <div className="text-xl sm:text-2xl font-black tracking-tight">
+            <span className="text-[#e10600]">F1</span>{' '}
+            <span className="text-white">GRID</span>{' '}
+            <span className="text-gray-500 text-lg">CHALLENGE</span>
           </div>
-          <div className="flex items-center gap-4">
-            {streak > 0 && (
-              <div className="flex items-center gap-1.5 bg-[#1a1a1a] border border-[#2a2a2a] rounded-full px-3 py-1.5">
-                <span className="text-orange-400">🔥</span>
-                <span className="text-sm font-bold text-white">{streak}</span>
-                <span className="text-xs text-gray-500 hidden sm:block">racha</span>
-              </div>
-            )}
-            <button
-              onClick={onShowResult}
-              className="text-xs text-gray-500 hover:text-white transition-colors font-semibold uppercase tracking-wider"
-            >
-              Resultado
-            </button>
-          </div>
+          <button
+            onClick={onNewGame}
+            className="text-xs text-gray-500 hover:text-white transition-colors font-semibold uppercase tracking-wider px-3 py-1.5 rounded-lg border border-[#2a2a2a] hover:border-[#444]"
+          >
+            Nueva partida
+          </button>
         </div>
       </header>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-2 py-4 sm:py-8">
-        <div className="w-full max-w-2xl">
-
-          {/* Attempts & score bar */}
-          <div className="flex items-center justify-between mb-4 px-1">
+      {/* Turn indicator */}
+      <div className="border-b border-[#2a2a2a]">
+        <div className="max-w-2xl mx-auto px-4 py-2.5 flex items-center justify-between">
+          {gameOver ? (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Intentos:</span>
-              <div className="flex gap-1">
-                {Array.from({ length: 9 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={`w-3 h-3 rounded-full transition-colors ${
-                      i < attemptsLeft
-                        ? 'bg-[#e10600]'
-                        : 'bg-[#2a2a2a]'
-                    }`}
-                  />
-                ))}
+              {winner === 'draw' ? (
+                <span className="text-sm font-bold text-yellow-400">🤝 ¡Empate!</span>
+              ) : (
+                <span className={`text-sm font-bold ${PLAYER_COLORS[winner].text}`}>
+                  🏆 {mode === 'ai' && winner === 'O' ? '¡La IA ganó!' : mode === 'ai' && winner === 'X' ? '¡Ganaste!' : `¡${PLAYER_COLORS[winner].label} ganó!`}
+                </span>
+              )}
+            </div>
+          ) : isAiTurn || aiThinking ? (
+            <div className="flex items-center gap-2 text-blue-400">
+              <div className="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm font-bold">🤖 IA pensando...</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${colors.bg} ${colors.text} border ${colors.border}`}>
+                {currentPlayer}
               </div>
+              <span className={`text-sm font-bold ${colors.text}`}>
+                {mode === 'ai' ? 'Tu turno' : `Turno de ${colors.label}`}
+              </span>
             </div>
-            <div className="text-sm font-bold text-gray-300">
-              <span className="text-white">{correctCount}</span>
-              <span className="text-gray-600">/9</span>
-            </div>
-          </div>
+          )}
 
-          {/* Grid */}
+          {/* Legend */}
+          <div className="flex items-center gap-3">
+            {(['X', 'O'] as Player[]).map(p => (
+              <div key={p} className="flex items-center gap-1">
+                <div className={`w-4 h-4 rounded-full border flex items-center justify-center text-[9px] font-black ${PLAYER_COLORS[p].bg} ${PLAYER_COLORS[p].text} ${PLAYER_COLORS[p].border}`}>
+                  {p}
+                </div>
+                <span className="text-[10px] text-gray-500">
+                  {mode === 'ai' ? (p === 'X' ? 'Vos' : 'IA') : PLAYER_COLORS[p].label.replace('Jugador ', 'J')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Grid */}
+      <div className="flex-1 flex items-center justify-center px-2 py-4 sm:py-8">
+        <div className="w-full max-w-2xl">
           <div className="grid grid-cols-[auto_1fr_1fr_1fr] gap-1.5 sm:gap-2">
-            {/* Top-left corner (empty) */}
-            <div className="rounded-lg bg-transparent" />
+            {/* Top-left corner */}
+            <div />
 
             {/* Column headers */}
             {grid.cols.map((col, ci) => (
               <div
                 key={ci}
-                className="flex items-center justify-center rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-2 py-2 sm:py-3 min-h-[52px]"
+                className="flex items-center justify-center rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-1 py-2 sm:py-3 min-h-[48px]"
               >
-                <span className="text-[10px] sm:text-xs font-bold text-center leading-tight text-gray-200 uppercase tracking-wide">
+                <span className="text-[10px] sm:text-xs font-bold text-center leading-tight text-gray-300 uppercase tracking-wide">
                   {col.shortLabel}
                 </span>
               </div>
@@ -110,46 +139,59 @@ export default function GameBoard({ gameData, gameState, streak, onAnswer, onSho
             {grid.rows.map((row, ri) => (
               <React.Fragment key={`row-${ri}`}>
                 {/* Row header */}
-                <div className="flex items-center justify-center rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-2 py-2 min-h-[80px] sm:min-h-[100px] min-w-[52px] sm:min-w-[64px]">
-                  <span className="text-[10px] sm:text-xs font-bold text-center leading-tight text-gray-200 uppercase tracking-wide [writing-mode:vertical-rl] rotate-180 sm:[writing-mode:horizontal-tb] sm:rotate-0">
+                <div className="flex items-center justify-center rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-1 py-2 min-h-[90px] sm:min-h-[110px] min-w-[48px] sm:min-w-[60px]">
+                  <span className="text-[10px] sm:text-xs font-bold text-center leading-tight text-gray-300 uppercase tracking-wide [writing-mode:vertical-rl] rotate-180 sm:[writing-mode:horizontal-tb] sm:rotate-0">
                     {row.shortLabel}
                   </span>
                 </div>
 
                 {/* Cells */}
                 {grid.cols.map((_, ci) => {
-                  const cell = cells[ri][ci];
-                  const driver = cell.driverId ? driverLookup[cell.driverId] : null;
-                  const isCorrect = cell.status === 'correct';
-                  const isShaking = cell.shake;
+                  const entry = board[ri][ci];
+                  const isWinCell = winSet.has(`${ri},${ci}`);
+                  const isShaking = shakeCell?.[0] === ri && shakeCell?.[1] === ci;
+                  const p = entry?.player;
+                  const driverInfo = entry?.driverId ? driverLookup[entry.driverId] : null;
+                  const blocked = gameOver || (isAiTurn && !entry);
 
                   return (
                     <button
-                      key={`cell-${ri}-${ci}`}
+                      key={`${ri}-${ci}`}
                       onClick={() => handleCellClick(ri, ci)}
-                      disabled={isCorrect || attemptsLeft === 0}
+                      disabled={!!entry || blocked}
                       className={[
-                        'relative flex flex-col items-center justify-center rounded-lg border transition-all duration-200 min-h-[80px] sm:min-h-[100px] p-2',
-                        isCorrect
-                          ? 'bg-green-800 border-green-600 cursor-default'
-                          : attemptsLeft === 0
-                          ? 'bg-[#1a1a1a] border-[#2a2a2a] cursor-not-allowed opacity-50'
-                          : 'bg-[#1a1a1a] border-[#2a2a2a] hover:border-[#e10600] hover:bg-[#221010] cursor-pointer active:scale-95',
-                        isShaking ? 'animate-shake border-red-600' : '',
+                        'relative flex flex-col items-center justify-center rounded-xl border-2 transition-all duration-200 min-h-[90px] sm:min-h-[110px] p-2 select-none',
+                        isWinCell
+                          ? `${p ? PLAYER_COLORS[p].bg : ''} ${p ? PLAYER_COLORS[p].border : ''} scale-105 shadow-lg`
+                          : entry
+                          ? `${p ? PLAYER_COLORS[p].bg : 'bg-[#1a1a1a]'} ${p ? PLAYER_COLORS[p].border : 'border-[#2a2a2a]'}`
+                          : isShaking
+                          ? 'bg-red-950 border-red-700 animate-shake'
+                          : blocked
+                          ? 'bg-[#111] border-[#222] opacity-60 cursor-not-allowed'
+                          : `bg-[#1a1a1a] border-[#2a2a2a] hover:border-${currentPlayer === 'X' ? '[#e10600]' : 'blue-500'} hover:bg-[#1f1f1f] cursor-pointer active:scale-95`,
                       ].join(' ')}
                     >
-                      {isCorrect && driver ? (
+                      {entry && driverInfo ? (
                         <>
-                          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-green-700 border-2 border-green-400 flex items-center justify-center mb-1.5 text-sm sm:text-base font-black text-white">
-                            {driver.initials}
+                          {/* Player symbol */}
+                          <div className={`text-xl sm:text-2xl font-black mb-1 ${p ? PLAYER_COLORS[p].text : ''}`}>
+                            {p}
                           </div>
-                          <span className="text-[10px] sm:text-xs font-bold text-green-200 text-center leading-tight line-clamp-2">
-                            {driver.fullName}
-                          </span>
+                          {/* Driver initials circle */}
+                          <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border-2 flex items-center justify-center text-xs sm:text-sm font-black text-white ${p ? PLAYER_COLORS[p].bg : ''} ${p ? PLAYER_COLORS[p].border : ''}`}>
+                            {driverInfo.initials}
+                          </div>
+                          {/* Driver name */}
+                          <div className={`mt-1 text-[9px] sm:text-[10px] font-bold text-center leading-tight line-clamp-2 ${p ? PLAYER_COLORS[p].text : 'text-gray-300'}`}>
+                            {driverInfo.fullName.split(' ').pop()}
+                          </div>
                         </>
+                      ) : isShaking ? (
+                        <div className="text-red-500 text-2xl font-black">✗</div>
                       ) : (
-                        <div className="text-2xl text-[#2a2a2a] font-black">
-                          {attemptsLeft === 0 ? '✗' : '+'}
+                        <div className="text-[#333] text-2xl font-black">
+                          {isAiTurn ? '…' : '+'}
                         </div>
                       )}
                     </button>
@@ -159,21 +201,57 @@ export default function GameBoard({ gameData, gameState, streak, onAnswer, onSho
             ))}
           </div>
 
-          {/* Date */}
-          <div className="text-center mt-4 text-xs text-gray-600 font-semibold uppercase tracking-wider">
-            {grid.dateKey}
+          <div className="text-center mt-3 text-xs text-gray-700 font-semibold uppercase tracking-wider">
+            {grid.dateKey} · {mode === 'ai' ? 'vs IA' : 'vs Amigo'}
           </div>
         </div>
       </div>
 
-      {/* Input Modal */}
-      {activeCell && (
+      {/* Result overlay */}
+      {gameOver && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-40 animate-fadeIn">
+          <div className="bg-[#111] border border-[#2a2a2a] rounded-2xl p-8 mx-4 text-center max-w-sm w-full shadow-2xl animate-popIn">
+            <div className="text-5xl mb-3">
+              {winner === 'draw' ? '🤝' : winner === 'X' ? '🏆' : mode === 'ai' ? '🤖' : '🏆'}
+            </div>
+            <div className="text-2xl font-black mb-1">
+              {winner === 'draw'
+                ? '¡Empate!'
+                : mode === 'ai' && winner === 'X'
+                ? '¡Ganaste!'
+                : mode === 'ai' && winner === 'O'
+                ? '¡La IA ganó!'
+                : `¡${PLAYER_COLORS[winner].label} ganó!`}
+            </div>
+            {winner !== 'draw' && (
+              <div className={`text-sm font-semibold mb-4 ${PLAYER_COLORS[winner].text}`}>
+                {winner} hizo 3 en línea
+              </div>
+            )}
+            {winner === 'draw' && (
+              <div className="text-sm text-gray-400 mb-4">
+                La grilla quedó completa sin ganador
+              </div>
+            )}
+            <button
+              onClick={onNewGame}
+              className="w-full py-3 bg-[#e10600] hover:bg-red-700 text-white font-black rounded-xl transition-colors text-sm tracking-wide uppercase"
+            >
+              Nueva partida
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Input modal */}
+      {activeCell && !gameOver && (
         <InputModal
-          rowLabel={grid.rows[activeCell.row].label}
-          colLabel={grid.cols[activeCell.col].label}
+          rowLabel={grid.rows[activeCell[0]].label}
+          colLabel={grid.cols[activeCell[1]].label}
           driverList={driverList}
-          usedDriverIds={gameState.usedDriverIds}
-          onSubmit={handleAnswer}
+          usedDriverIds={tttState.usedDriverIds}
+          currentPlayer={currentPlayer}
+          onSubmit={handleSubmit}
           onClose={() => setActiveCell(null)}
         />
       )}
