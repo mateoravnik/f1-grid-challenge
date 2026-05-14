@@ -3,7 +3,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import ModeSelect from './ModeSelect';
 import GameBoard from './GameBoard';
+import { generateDailyGrid } from '@/lib/gridGenerator';
 import type { DailyGrid } from '@/lib/gridGenerator';
+import type { DriverProfile } from '@/lib/f1Data';
 
 // ---------------------------------------------------------------------------
 // Shared types
@@ -45,6 +47,7 @@ export interface GameData {
   grid: DailyGrid;
   driverLookup: Record<string, DriverLookup>;
   driverList: DriverListItem[];
+  driverProfiles: DriverProfile[];
 }
 
 // ---------------------------------------------------------------------------
@@ -224,6 +227,13 @@ export default function GameContainer() {
   }, [tttState?.currentPlayer, tttState?.winner, tttState?.aiThinking, tttState?.mode]);
 
   const startGame = useCallback((mode: GameMode) => {
+    if (!gameData) return;
+    // Rebuild driver map from serialized profiles and generate a fresh random grid
+    const driversMap = new Map<string, DriverProfile>(
+      gameData.driverProfiles.map(p => [p.id, p])
+    );
+    const newGrid = generateDailyGrid(driversMap);
+    setGameData(prev => prev ? { ...prev, grid: newGrid } : prev);
     setTttState({
       mode,
       board: emptyBoard(),
@@ -235,7 +245,7 @@ export default function GameContainer() {
       shakeCell: null,
     });
     setPhase('playing');
-  }, []);
+  }, [gameData]);
 
   const handleAnswer = useCallback((row: number, col: number, driverId: string) => {
     if (!gameData || !tttState) return;

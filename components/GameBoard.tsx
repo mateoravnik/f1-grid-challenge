@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { GameData, TicTacToeState, Player } from './GameContainer';
 import InputModal from './InputModal';
 
@@ -30,8 +30,33 @@ const PLAYER_COLORS: Record<Player, { bg: string; border: string; text: string; 
 
 export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: Props) {
   const [activeCell, setActiveCell] = useState<[number, number] | null>(null);
+  const [driverPhotos, setDriverPhotos] = useState<Record<string, string | null>>({});
+  const fetchedIds = useRef<Set<string>>(new Set());
   const { grid, driverLookup, driverList } = gameData;
   const { board, currentPlayer, winner, winLine, aiThinking, shakeCell, mode } = tttState;
+
+  // Fetch Wikipedia photos for drivers as they fill cells
+  useEffect(() => {
+    for (const row of board) {
+      for (const cell of row) {
+        if (!cell) continue;
+        const { driverId } = cell;
+        if (fetchedIds.current.has(driverId)) continue;
+        fetchedIds.current.add(driverId);
+        const info = driverLookup[driverId];
+        if (!info) continue;
+        const slug = info.fullName.trim().replace(/\s+/g, '_');
+        fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(slug)}`)
+          .then(r => r.ok ? r.json() : null)
+          .then((data: { thumbnail?: { source?: string } } | null) => {
+            setDriverPhotos(prev => ({ ...prev, [driverId]: data?.thumbnail?.source ?? null }));
+          })
+          .catch(() => {
+            setDriverPhotos(prev => ({ ...prev, [driverId]: null }));
+          });
+      }
+    }
+  }, [board, driverLookup]);
 
   const isAiTurn = mode === 'ai' && currentPlayer === 'O';
   const gameOver = winner !== null;
@@ -178,10 +203,20 @@ export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: P
                           <div className={`text-xl sm:text-2xl font-black mb-1 ${p ? PLAYER_COLORS[p].text : ''}`}>
                             {p}
                           </div>
-                          {/* Driver initials circle */}
-                          <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border-2 flex items-center justify-center text-xs sm:text-sm font-black text-white ${p ? PLAYER_COLORS[p].bg : ''} ${p ? PLAYER_COLORS[p].border : ''}`}>
-                            {driverInfo.initials}
-                          </div>
+                          {/* Photo or initials circle */}
+                          {driverPhotos[entry.driverId] ? (
+                            <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border-2 overflow-hidden flex-shrink-0 ${p ? PLAYER_COLORS[p].border : ''}`}>
+                              <img
+                                src={driverPhotos[entry.driverId]!}
+                                alt={driverInfo.fullName}
+                                className="w-full h-full object-cover object-top"
+                              />
+                            </div>
+                          ) : (
+                            <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border-2 flex items-center justify-center text-xs sm:text-sm font-black text-white ${p ? PLAYER_COLORS[p].bg : ''} ${p ? PLAYER_COLORS[p].border : ''}`}>
+                              {driverInfo.initials}
+                            </div>
+                          )}
                           {/* Driver name */}
                           <div className={`mt-1 text-[9px] sm:text-[10px] font-bold text-center leading-tight line-clamp-2 ${p ? PLAYER_COLORS[p].text : 'text-gray-300'}`}>
                             {driverInfo.fullName.split(' ').pop()}

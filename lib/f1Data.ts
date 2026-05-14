@@ -72,8 +72,8 @@ const FALLBACK_DRIVERS: FallbackRow[] = [
   ['lauda',              'Niki',         'Lauda',         'Austrian',  ['ferrari','mclaren','brabham'],            true,  true,  true,  true,  false],
   ['mansell',            'Nigel',        'Mansell',       'British',   ['ferrari','williams'],                    true,  true,  true,  true,  false],
   ['hill',               'Damon',        'Hill',          'British',   ['williams','ferrari'],                    true,  true,  true,  true,  false],
-  ['piquet',             'Nelson',       'Piquet',        'Brazilian', ['brabham','williams','ferrari'],           true,  true,  true,  true,  true],
-  ['scheckter',          'Jody',         'Scheckter',     'South African', ['tyrrell','ferrari','williams'],       true,  true,  false, true,  false],
+  ['piquet',             'Nelson',       'Piquet',        'Brazilian', ['brabham','williams'],                    true,  true,  true,  true,  true],
+  ['scheckter',          'Jody',         'Scheckter',     'South African', ['tyrrell','ferrari'],                  true,  true,  false, true,  false],
   ['button',             'Jenson',       'Button',        'British',   ['williams','mclaren','renault'],           true,  true,  false, true,  false],
   ['rosberg',            'Nico',         'Rosberg',       'German',    ['williams','mercedes'],                   true,  true,  false, true,  false],
   ['hakkinen',           'Mika',         'Häkkinen',      'Finnish',   ['mclaren'],                               true,  true,  true,  true,  false],
@@ -99,8 +99,8 @@ const FALLBACK_DRIVERS: FallbackRow[] = [
   ['grosjean',           'Romain',       'Grosjean',      'French',    ['renault','lotus_f1'],                    false, false, false, true,  false],
   ['maldonado',          'Pastor',       'Maldonado',     'Venezuelan',['williams','lotus_f1'],                   false, true,  false, false, true],
   ['kubica',             'Robert',       'Kubica',        'Polish',    ['renault','williams'],                    false, true,  false, true,  false],
-  ['fisichella',         'Giancarlo',    'Fisichella',    'Italian',   ['renault','ferrari','williams'],           false, true,  false, true,  false],
-  ['trulli',             'Jarno',        'Trulli',        'Italian',   ['renault','williams'],                    false, true,  false, true,  false],
+  ['fisichella',         'Giancarlo',    'Fisichella',    'Italian',   ['renault','ferrari','williams'],           false, true,  true,  true,  false],
+  ['trulli',             'Jarno',        'Trulli',        'Italian',   ['renault','williams'],                    false, true,  true,  true,  false],
   ['frentzen',           'Heinz-Harald', 'Frentzen',      'German',    ['williams'],                              false, true,  true,  true,  false],
   ['villeneuve',         'Jacques',      'Villeneuve',    'Canadian',  ['williams'],                              true,  true,  true,  true,  false],
   ['irvine',             'Eddie',        'Irvine',        'British',   ['ferrari'],                               false, true,  true,  true,  false],
@@ -110,16 +110,15 @@ const FALLBACK_DRIVERS: FallbackRow[] = [
   ['kovalainen',         'Heikki',       'Kovalainen',    'Finnish',   ['renault','mclaren'],                     false, false, false, true,  false],
   ['sutil',              'Adrian',       'Sutil',         'German',    ['mercedes'],                              false, false, false, true,  false],
   ['de_la_rosa',         'Pedro',        'de la Rosa',    'Spanish',   ['mclaren','ferrari'],                     false, false, false, true,  false],
-  ['ralf_schumacher',    'Ralf',         'Schumacher',    'German',    ['williams','ferrari'],                    false, true,  true,  true,  false],
+  ['ralf_schumacher',    'Ralf',         'Schumacher',    'German',    ['williams'],                              false, true,  true,  true,  false],
   ['berger',             'Gerhard',      'Berger',        'Austrian',  ['ferrari','mclaren'],                     false, true,  true,  true,  false],
   ['alesi',              'Jean',         'Alesi',         'French',    ['ferrari','tyrrell'],                     false, true,  true,  true,  false],
   ['patrese',            'Riccardo',     'Patrese',       'Italian',   ['brabham','williams'],                    false, true,  true,  true,  false],
   ['boutsen',            'Thierry',      'Boutsen',       'Belgian',   ['williams'],                              false, true,  true,  true,  false],
-  ['brundle',            'Martin',       'Brundle',       'British',   ['tyrrell','williams','mclaren'],           false, false, true,  true,  false],
+  ['brundle',            'Martin',       'Brundle',       'British',   ['tyrrell','mclaren','brabham'],            false, false, true,  true,  false],
   ['warwick',            'Derek',        'Warwick',       'British',   ['renault','brabham'],                     false, false, true,  true,  false],
   ['blundell',           'Mark',         'Blundell',      'British',   ['tyrrell','mclaren','williams'],           false, false, true,  false, false],
   ['nannini',            'Alessandro',   'Nannini',       'Italian',   ['ferrari'],                               false, true,  true,  false, false],
-  ['mansell',            'Nigel',        'Mansell',       'British',   ['ferrari','williams'],                    true,  true,  true,  true,  false],
   ['piquet_jr',          'Nelson',       'Piquet Jr.',    'Brazilian', ['renault','williams'],                    false, false, false, false, true],
   ['reutemann',          'Carlos',       'Reutemann',     'Argentine', ['brabham','ferrari','williams','tyrrell'], false, true,  false, true,  true],
   ['regazzoni',          'Clay',         'Regazzoni',     'Swiss',     ['ferrari','tyrrell','williams','brabham'], false, true,  false, true,  false],
@@ -132,6 +131,20 @@ const FALLBACK_DRIVERS: FallbackRow[] = [
   ['fittipaldi',         'Emerson',      'Fittipaldi',    'Brazilian', ['lotus_f1','mclaren','brabham'],           true,  true,  false, true,  true],
   ['salo',               'Mika',         'Salo',          'Finnish',   ['ferrari','mclaren','tyrrell'],            false, false, true,  true,  false],
   ['pironi',             'Didier',       'Pironi',        'French',    ['tyrrell','ferrari','brabham'],            false, true,  false, false, false],
+  // ─── Added for broader coverage ─────────────────────────────────────────────
+  ['alboreto',           'Michele',      'Alboreto',      'Italian',   ['tyrrell','ferrari'],                     false, true,  true,  true,  false],
+  ['de_cesaris',         'Andrea',       'de Cesaris',    'Italian',   ['tyrrell','brabham'],                     false, false, true,  true,  false],
+  ['nakajima_s',         'Satoru',       'Nakajima',      'Japanese',  ['williams','tyrrell'],                    false, false, true,  false, false],
+  ['katayama_u',         'Ukyo',         'Katayama',      'Japanese',  ['tyrrell'],                               false, false, true,  false, false],
+  ['jos_verstappen',     'Jos',          'Verstappen',    'Dutch',     ['tyrrell'],                               false, false, true,  true,  false],
+  ['andretti_m',         'Michael',      'Andretti',      'American',  ['mclaren'],                               false, false, true,  false, false],
+  ['johansson',          'Stefan',       'Johansson',     'Swedish',   ['ferrari','mclaren','tyrrell'],            false, false, true,  false, false],
+  ['capelli',            'Ivan',         'Capelli',       'Italian',   ['ferrari'],                               false, false, true,  false, false],
+  ['larini',             'Nicola',       'Larini',        'Italian',   ['ferrari'],                               false, false, true,  false, false],
+  ['badoer',             'Luca',         'Badoer',        'Italian',   ['ferrari'],                               false, false, true,  false, false],
+  ['morbidelli_g',       'Gianni',       'Morbidelli',    'Italian',   ['ferrari'],                               false, false, true,  false, false],
+  ['piastri',            'Oscar',        'Piastri',       'Australian',['mclaren'],                               false, true,  false, false, false],
+  ['tsunoda',            'Yuki',         'Tsunoda',       'Japanese',  ['red_bull'],                              false, false, false, true,  false],
 ];
 
 function buildFallbackDriverMap(): Map<string, DriverProfile> {
@@ -170,6 +183,7 @@ const KNOWN_CENTENARIANS = new Set([
   'reutemann','lauda','watson','laffite','pironi','rosberg_k',
   'piquet','arnoux','fittipaldi','blundell','zanardi','albon',
   'tsunoda','zhou','sargeant',
+  'alboreto','de_cesaris','jos_verstappen',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -289,7 +303,12 @@ function mergeApiData(
   const merged = new Map<string, DriverProfile>(FALLBACK_DRIVER_MAP);
 
   for (const [id, driver] of apiDrivers) {
-    const constructors = constructorMap.get(id) ?? driver.constructors;
+    const apiConstructors = constructorMap.get(id) ?? [];
+    // Preserve fallback constructors when API gives us none (e.g. timed-out constructor fetches)
+    const fallbackConstructors = FALLBACK_DRIVER_MAP.get(id)?.constructors ?? [];
+    const constructors = apiConstructors.length > 0 ? apiConstructors
+      : fallbackConstructors.length > 0 ? fallbackConstructors
+      : driver.constructors;
     merged.set(id, {
       ...driver,
       constructors,

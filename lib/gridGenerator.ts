@@ -38,16 +38,6 @@ function getDateKey(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
 }
 
-function dateSeed(date: Date): number {
-  const y = date.getUTCFullYear();
-  const m = date.getUTCMonth() + 1;
-  const d = date.getUTCDate();
-  // Knuth hash the date
-  let h = (y * 10000 + m * 100 + d) >>> 0;
-  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0;
-  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0;
-  return h ^ (h >>> 16);
-}
 
 function getValidDriverIds(
   drivers: Map<string, DriverProfile>,
@@ -72,10 +62,10 @@ function getValidDriverIds(
 
 export function generateDailyGrid(
   drivers: Map<string, DriverProfile>,
-  date: Date = new Date()
+  seed?: number
 ): DailyGrid {
-  const dateKey = getDateKey(date);
-  const baseSeed = dateSeed(date);
+  const dateKey = getDateKey(new Date());
+  const baseSeed = (seed !== undefined ? seed : Math.random() * 0xffffffff) >>> 0;
 
   // Build condition pool: all constructors + all special conditions
   const constructorConditions: ConditionDef[] = CONSTRUCTOR_POOL.map((c) => ({

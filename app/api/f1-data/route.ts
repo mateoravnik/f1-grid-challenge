@@ -7,8 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const { drivers, fetchedAt } = await getF1Data();
-    const today = new Date();
-    const grid = generateDailyGrid(drivers, today);
+    const grid = generateDailyGrid(drivers);
 
     const driverLookup: Record<string, { fullName: string; initials: string; nationality: string }> = {};
     for (const [id, driver] of drivers) {
@@ -19,20 +18,35 @@ export async function GET() {
       };
     }
 
-    const driverList = Array.from(drivers.values())
-      .filter((d) => d.constructors.length > 0)
-      .map((d) => ({
-        id: d.id,
-        fullName: d.fullName,
-        givenName: d.givenName,
-        familyName: d.familyName,
-        nationality: d.nationality,
-      }));
+    const allDrivers = Array.from(drivers.values()).filter((d) => d.constructors.length > 0);
+
+    const driverList = allDrivers.map((d) => ({
+      id: d.id,
+      fullName: d.fullName,
+      givenName: d.givenName,
+      familyName: d.familyName,
+      nationality: d.nationality,
+    }));
+
+    const driverProfiles = allDrivers.map((d) => ({
+      id: d.id,
+      fullName: d.fullName,
+      givenName: d.givenName,
+      familyName: d.familyName,
+      nationality: d.nationality,
+      constructors: d.constructors,
+      isChampion: d.isChampion,
+      isRaceWinner: d.isRaceWinner,
+      racedIn90s: d.racedIn90s,
+      gpsOver100: d.gpsOver100,
+      isLatinAmerican: d.isLatinAmerican,
+    }));
 
     return NextResponse.json({
       grid,
       driverLookup,
       driverList,
+      driverProfiles,
       driverCount: drivers.size,
       generatedAt: new Date(fetchedAt).toISOString(),
     });
