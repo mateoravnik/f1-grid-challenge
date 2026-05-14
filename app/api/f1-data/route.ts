@@ -6,11 +6,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const { drivers } = await getF1Data();
+    const { drivers, fetchedAt } = await getF1Data();
     const today = new Date();
     const grid = generateDailyGrid(drivers, today);
 
-    // Build driver lookup for client (id → name + initials)
     const driverLookup: Record<string, { fullName: string; initials: string; nationality: string }> = {};
     for (const [id, driver] of drivers) {
       driverLookup[id] = {
@@ -20,7 +19,6 @@ export async function GET() {
       };
     }
 
-    // Serialize driver list for autocomplete (only drivers with known team history)
     const driverList = Array.from(drivers.values())
       .filter((d) => d.constructors.length > 0)
       .map((d) => ({
@@ -35,12 +33,13 @@ export async function GET() {
       grid,
       driverLookup,
       driverList,
-      generatedAt: new Date().toISOString(),
+      driverCount: drivers.size,
+      generatedAt: new Date(fetchedAt).toISOString(),
     });
   } catch (err) {
     console.error('F1 data error:', err);
     return NextResponse.json(
-      { error: 'Failed to load F1 data. Please try again.' },
+      { error: 'No se pudo generar la grilla. Por favor recargá la página.' },
       { status: 500 }
     );
   }
