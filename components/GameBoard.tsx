@@ -11,6 +11,17 @@ interface Props {
   onNewGame: () => void;
 }
 
+const NATIONALITY_FLAGS: Record<string, string> = {
+  'Argentine': '🇦🇷', 'German': '🇩🇪', 'Brazilian': '🇧🇷', 'British': '🇬🇧',
+  'Finnish': '🇫🇮', 'French': '🇫🇷', 'Spanish': '🇪🇸', 'Australian': '🇦🇺',
+  'Canadian': '🇨🇦', 'Monegasque': '🇲🇨', 'Dutch': '🇳🇱', 'Mexican': '🇲🇽',
+  'Italian': '🇮🇹', 'Austrian': '🇦🇹', 'Swiss': '🇨🇭', 'Belgian': '🇧🇪',
+  'Swedish': '🇸🇪', 'Polish': '🇵🇱', 'Danish': '🇩🇰', 'Russian': '🇷🇺',
+  'Portuguese': '🇵🇹', 'Hungarian': '🇭🇺', 'Colombian': '🇨🇴', 'Venezuelan': '🇻🇪',
+  'South African': '🇿🇦', 'Japanese': '🇯🇵', 'American': '🇺🇸', 'Thai': '🇹🇭',
+  'New Zealander': '🇳🇿', 'Irish': '🇮🇪',
+};
+
 const PLAYER_COLORS: Record<Player, { bg: string; border: string; text: string; ring: string; label: string }> = {
   X: {
     bg: 'bg-red-900/70',
@@ -252,8 +263,9 @@ export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: P
                               {driverInfo.initials}
                             </div>
                           )}
-                          {/* Driver name */}
+                          {/* Driver name + flag */}
                           <div className={`mt-1 text-[9px] sm:text-[10px] font-bold text-center leading-tight line-clamp-2 ${p ? PLAYER_COLORS[p].text : 'text-gray-300'}`}>
+                            {NATIONALITY_FLAGS[driverInfo.nationality] ?? ''}{' '}
                             {driverInfo.fullName.split(' ').pop()}
                           </div>
                         </>

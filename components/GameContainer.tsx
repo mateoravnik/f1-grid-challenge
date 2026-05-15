@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import ModeSelect from './ModeSelect';
 import GameBoard from './GameBoard';
 import { generateDailyGrid } from '@/lib/gridGenerator';
-import type { DailyGrid } from '@/lib/gridGenerator';
+import type { DailyGrid, GridDifficulty } from '@/lib/gridGenerator';
 import type { DriverProfile } from '@/lib/f1Data';
 
 // ---------------------------------------------------------------------------
@@ -13,6 +13,7 @@ import type { DriverProfile } from '@/lib/f1Data';
 export type Player = 'X' | 'O';
 export type GameMode = 'friend' | 'ai';
 export type AiDifficulty = 'easy' | 'medium' | 'hard';
+export type { GridDifficulty };
 
 export interface CellEntry {
   player: Player;
@@ -22,6 +23,7 @@ export interface CellEntry {
 export interface TicTacToeState {
   mode: GameMode;
   aiDifficulty: AiDifficulty;
+  gridDifficulty: GridDifficulty;
   board: (CellEntry | null)[][];
   currentPlayer: Player;
   usedDriverIds: Set<string>;
@@ -108,17 +110,24 @@ function findAiMove(state: TicTacToeState, grid: DailyGrid): AiMove | null {
 
   if (candidates.length === 0) return null;
 
-  const pick = (cell: CandidateCell): AiMove => ({
+  // Easy: first available cell, first available driver (deterministic, no strategy)
+  if (state.aiDifficulty === 'easy') {
+    const cell = candidates[0];
+    return { row: cell.row, col: cell.col, driverId: cell.drivers[0] };
+  }
+
+  const pickRandom = (cell: CandidateCell): AiMove => ({
     row: cell.row,
     col: cell.col,
     driverId: cell.drivers[Math.floor(Math.random() * cell.drivers.length)],
   });
 
-  // Easy: random cell, random driver
-  if (state.aiDifficulty === 'easy') {
-    return pick(candidates[Math.floor(Math.random() * candidates.length)]);
+  // Medium: random cell, random driver (no strategy)
+  if (state.aiDifficulty === 'medium') {
+    return pickRandom(candidates[Math.floor(Math.random() * candidates.length)]);
   }
 
+  // Hard: win if possible, then block, then pick cell that covers most X-threatening lines
   const simWins = (player: Player): CandidateCell | undefined =>
     candidates.find(({ row, col }) => {
       const sim = state.board.map(r => [...r]);
@@ -127,17 +136,11 @@ function findAiMove(state: TicTacToeState, grid: DailyGrid): AiMove | null {
     });
 
   const winning = simWins('O');
-  if (winning) return pick(winning);
+  if (winning) return pickRandom(winning);
 
   const blocking = simWins('X');
-  if (blocking) return pick(blocking);
+  if (blocking) return pickRandom(blocking);
 
-  // Medium: random after win/block
-  if (state.aiDifficulty === 'medium') {
-    return pick(candidates[Math.floor(Math.random() * candidates.length)]);
-  }
-
-  // Hard: pick cell that blocks the most opponent winning lines, then center > corners
   const scored = candidates.map(cell => {
     let threat = 0;
     for (const line of WIN_LINES) {
@@ -151,15 +154,15 @@ function findAiMove(state: TicTacToeState, grid: DailyGrid): AiMove | null {
   });
   scored.sort((a, b) => b.threat - a.threat);
   const best = scored[0];
-  if (best.threat > 0) return pick(best.cell);
+  if (best.threat > 0) return pickRandom(best.cell);
 
   const center = candidates.find(m => m.row === 1 && m.col === 1);
-  if (center) return pick(center);
+  if (center) return pickRandom(center);
 
   const corners = candidates.filter(m => (m.row === 0 || m.row === 2) && (m.col === 0 || m.col === 2));
-  if (corners.length > 0) return pick(corners[Math.floor(Math.random() * corners.length)]);
+  if (corners.length > 0) return pickRandom(corners[Math.floor(Math.random() * corners.length)]);
 
-  return pick(candidates[Math.floor(Math.random() * candidates.length)]);
+  return pickRandom(candidates[Math.floor(Math.random() * candidates.length)]);
 }
 
 // ---------------------------------------------------------------------------
@@ -255,21 +258,35 @@ export default function GameContainer() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tttState?.currentPlayer, tttState?.winner, tttState?.mode]);
 
-  const startGame = useCallback((mode: GameMode, difficulty: AiDifficulty = 'medium') => {
+  const startGame = useCallback((
+    mode: GameMode,
+    aiDifficulty: AiDifficulty = 'medium',
+    gridDifficulty: GridDifficulty = 'medium'
+  ) => {
     if (!gameData) return;
+    // Cancel any pending timers from previous game
+    if (shakeTimerRef.current) clearTimeout(shakeTimerRef.current);
+    if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+
     const driversMap = new Map<string, DriverProfile>(
       gameData.driverProfiles.map(p => [p.id, p])
     );
+
+    // Debug: log Alonso's profile to verify constructor + raceWinner data
+    const alonso = gameData.driverProfiles.find(p => p.id === 'alonso');
+    if (alonso) console.log('[F1] Alonso profile:', JSON.stringify(alonso));
+
     let newGrid = gameData.grid;
     try {
-      newGrid = generateDailyGrid(driversMap);
-    } catch {
-      // Fall back to the API-provided grid if generation fails
+      newGrid = generateDailyGrid(driversMap, undefined, gridDifficulty);
+    } catch (err) {
+      console.warn('[F1] Grid generation failed, using previous grid:', err);
     }
     setGameData(prev => prev ? { ...prev, grid: newGrid } : prev);
     setTttState({
       mode,
-      aiDifficulty: difficulty,
+      aiDifficulty,
+      gridDifficulty,
       board: emptyBoard(),
       currentPlayer: 'X',
       usedDriverIds: new Set(),
@@ -327,7 +344,9 @@ export default function GameContainer() {
     </div>
   );
 
-  if (phase === 'mode-select') return <ModeSelect onSelect={startGame} />;
+  if (phase === 'mode-select') return (
+    <ModeSelect onSelect={(mode, aiDiff, gridDiff) => startGame(mode, aiDiff, gridDiff)} />
+  );
 
   if (!gameData || !tttState) return null;
 

@@ -1,5 +1,7 @@
 import { CONSTRUCTOR_POOL, SPECIAL_CONDITIONS, DriverProfile, driverMatchesCondition } from './f1Data';
 
+export type GridDifficulty = 'easy' | 'medium' | 'hard';
+
 export type ConditionDef =
   | { type: 'constructor'; id: string; label: string; shortLabel: string; wikiSlug?: string }
   | { type: 'special'; id: string; label: string; shortLabel: string; wikiSlug?: string };
@@ -62,7 +64,8 @@ function getValidDriverIds(
 
 export function generateDailyGrid(
   drivers: Map<string, DriverProfile>,
-  seed?: number
+  seed?: number,
+  gridDifficulty: GridDifficulty = 'medium'
 ): DailyGrid {
   const dateKey = getDateKey(new Date());
   const baseSeed = (seed !== undefined ? seed : Math.random() * 0xffffffff) >>> 0;
@@ -84,13 +87,10 @@ export function generateDailyGrid(
 
   const allConditions = [...constructorConditions, ...specialConditions];
 
-  // Try different seeds until we find a valid grid (min 3 valid drivers per cell)
-  const MIN_VALID = 3;
-
-  // Pre-filter: only include conditions where enough total drivers match.
-  // This removes sparse new constructors (alphatauri, aston_martin, etc.) from the
-  // generation pool so the algorithm finds valid grids quickly.
-  const MIN_POOL_COVERAGE = 5;
+  // MIN_VALID and MIN_POOL_COVERAGE vary by grid difficulty
+  // easy: many options per cell (6+), medium: moderate (3+), hard: few (1+)
+  const MIN_VALID = gridDifficulty === 'easy' ? 6 : gridDifficulty === 'hard' ? 1 : 3;
+  const MIN_POOL_COVERAGE = gridDifficulty === 'easy' ? 10 : gridDifficulty === 'hard' ? 3 : 5;
   const condArg = (c: ConditionDef) =>
     c.type === 'constructor' ? { type: 'constructor', id: c.id } : { type: 'special', id: c.id };
 
