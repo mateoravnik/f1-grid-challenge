@@ -61,6 +61,7 @@ function getPilotPhoto(wikiName: string): string {
 }
 
 function FlagImg({ code }: { code: string }) {
+  if (!code) return null;
   return (
     <img
       src={`https://flagcdn.com/16x12/${code.toLowerCase()}.png`}
@@ -123,6 +124,8 @@ function PlacingPhase({
 }) {
   const pilot = pilots[currentPilotIdx];
   const slots = allSlots();
+
+  if (!pilot) return null;
 
   return (
     <div className="flex flex-col items-center gap-6 w-full max-w-lg mx-auto">
@@ -428,20 +431,18 @@ function randomCategory(exclude?: PyramidCategory): PyramidCategory {
 }
 
 export default function PyramidGame({ onHome }: Props) {
-  const [category, setCategory] = useState<PyramidCategory>(() => randomCategory());
-  const [pilots, setPilots] = useState<PyramidPilot[]>(() => []);
+  // Initialise category and pilots together so pilots is never empty on first render
+  const [{ category: initCat, pilots: initPilots }] = useState(() => {
+    const cat = randomCategory();
+    return { category: cat, pilots: selectPilots(cat, Date.now()) };
+  });
+  const [category, setCategory] = useState<PyramidCategory>(initCat);
+  const [pilots, setPilots] = useState<PyramidPilot[]>(initPilots);
   const [placed, setPlaced] = useState<(string | null)[]>(Array(TOTAL_SLOTS).fill(null));
   const [currentPilotIdx, setCurrentPilotIdx] = useState(0);
   const [phase, setPhase] = useState<Phase>('placing');
   const [checkResult, setCheckResult] = useState<('correct' | 'wrong' | null)[] | null>(null);
   const [checkUsed, setCheckUsed] = useState(false);
-
-  // Start first game on mount
-  useEffect(() => {
-    const seed = Date.now();
-    setPilots(selectPilots(category, seed));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const startGame = useCallback((cat: PyramidCategory) => {
     const seed = Date.now();
