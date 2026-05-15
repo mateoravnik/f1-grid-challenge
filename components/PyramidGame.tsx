@@ -206,6 +206,7 @@ function ArrangingPhase({
   onCheck,
   onReveal,
   checkResult,
+  checkUsed,
 }: {
   pilots: PyramidPilot[];
   category: PyramidCategory;
@@ -214,6 +215,7 @@ function ArrangingPhase({
   onCheck: () => void;
   onReveal: () => void;
   checkResult: ('correct' | 'wrong' | null)[] | null;
+  checkUsed: boolean;
 }) {
   const dragSrc = useRef<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
@@ -310,10 +312,16 @@ function ArrangingPhase({
 
       <div className="flex gap-3 w-full">
         <button
-          onClick={onCheck}
-          className="flex-1 py-3 rounded-xl bg-[#1a1a1a] border border-[#3a3a3a] text-gray-300 hover:text-white hover:border-[#555] transition-colors text-sm font-bold uppercase tracking-wider"
+          onClick={!checkUsed ? onCheck : undefined}
+          disabled={checkUsed}
+          className={[
+            'flex-1 py-3 rounded-xl border text-sm font-bold uppercase tracking-wider transition-colors',
+            checkUsed
+              ? 'bg-[#1a1a1a] border-[#2a2a2a] text-gray-600 cursor-not-allowed'
+              : 'bg-[#1a1a1a] border-[#3a3a3a] text-gray-300 hover:text-white hover:border-[#555]',
+          ].join(' ')}
         >
-          ¿Cómo voy?
+          {checkUsed ? 'Ya usaste tu ayuda' : '¿Cómo voy?'}
         </button>
         <button
           onClick={onReveal}
@@ -410,52 +418,41 @@ function ResultPhase({
 }
 
 // -------------------------------------------------------------------------
-// Category Select
-// -------------------------------------------------------------------------
-function CategorySelect({ onSelect }: { onSelect: (cat: PyramidCategory) => void }) {
-  return (
-    <div className="flex flex-col items-center gap-6 w-full max-w-md mx-auto">
-      <div className="text-center">
-        <div className="text-2xl font-black text-white mb-1">F1 Pyramid</div>
-        <p className="text-gray-400 text-sm">Elegí la estadística para ordenar</p>
-      </div>
-      <div className="w-full space-y-2">
-        {PYRAMID_CATEGORIES.map(cat => (
-          <button
-            key={cat.id}
-            onClick={() => onSelect(cat)}
-            className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-5 py-3.5 text-left hover:border-yellow-500 hover:bg-yellow-950/10 transition-all duration-150 active:scale-[0.98] flex items-center justify-between"
-          >
-            <span className="text-white font-bold text-sm">{cat.label}</span>
-            <span className="text-gray-600 text-xs font-semibold ml-2 flex-shrink-0">{cat.unit}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// -------------------------------------------------------------------------
 // Main PyramidGame component
 // -------------------------------------------------------------------------
+function randomCategory(exclude?: PyramidCategory): PyramidCategory {
+  const pool = exclude
+    ? PYRAMID_CATEGORIES.filter(c => c.id !== exclude.id)
+    : PYRAMID_CATEGORIES;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 export default function PyramidGame({ onHome }: Props) {
-  const [category, setCategory] = useState<PyramidCategory | null>(null);
-  const [pilots, setPilots] = useState<PyramidPilot[]>([]);
+  const [category, setCategory] = useState<PyramidCategory>(() => randomCategory());
+  const [pilots, setPilots] = useState<PyramidPilot[]>(() => []);
   const [placed, setPlaced] = useState<(string | null)[]>(Array(TOTAL_SLOTS).fill(null));
   const [currentPilotIdx, setCurrentPilotIdx] = useState(0);
   const [phase, setPhase] = useState<Phase>('placing');
   const [checkResult, setCheckResult] = useState<('correct' | 'wrong' | null)[] | null>(null);
-  const [seed] = useState(() => Date.now());
+  const [checkUsed, setCheckUsed] = useState(false);
+
+  // Start first game on mount
+  useEffect(() => {
+    const seed = Date.now();
+    setPilots(selectPilots(category, seed));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startGame = useCallback((cat: PyramidCategory) => {
-    const selectedPilots = selectPilots(cat, seed);
+    const seed = Date.now();
     setCategory(cat);
-    setPilots(selectedPilots);
+    setPilots(selectPilots(cat, seed));
     setPlaced(Array(TOTAL_SLOTS).fill(null));
     setCurrentPilotIdx(0);
     setPhase('placing');
     setCheckResult(null);
-  }, [seed]);
+    setCheckUsed(false);
+  }, []);
 
   const handlePlace = useCallback((slotIdx: number) => {
     if (!pilots.length || currentPilotIdx >= pilots.length) return;
@@ -482,12 +479,12 @@ export default function PyramidGame({ onHome }: Props) {
   }, []);
 
   const handleCheck = useCallback(() => {
-    if (!category) return;
     const results = placed.map((id, slotIdx) => {
       if (!id) return null;
       return isCorrectSlot(slotIdx, id, pilots, category) ? 'correct' : 'wrong';
     }) as ('correct' | 'wrong' | null)[];
     setCheckResult(results);
+    setCheckUsed(true);
   }, [placed, pilots, category]);
 
   const handleReveal = useCallback(() => {
@@ -495,35 +492,8 @@ export default function PyramidGame({ onHome }: Props) {
   }, []);
 
   const handlePlayAgain = useCallback(() => {
-    setCategory(null);
-    setPhase('placing');
-  }, []);
-
-  if (!category) {
-    return (
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <header className="bg-[#0a0a0a] border-b border-[#1a1a1a] px-4 py-3 flex items-center gap-3">
-          <button
-            onClick={onHome}
-            className="text-gray-500 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest flex items-center gap-1.5"
-          >
-            ← Inicio
-          </button>
-          <div className="flex-1 flex justify-center">
-            <span className="text-sm font-black tracking-tight">
-              <span className="text-yellow-400">F1</span>{' '}
-              <span className="text-white">PYRAMID</span>
-            </span>
-          </div>
-          <div className="w-16" />
-        </header>
-        <div className="flex-1 flex flex-col items-center justify-center p-6">
-          <CategorySelect onSelect={startGame} />
-        </div>
-      </div>
-    );
-  }
+    startGame(randomCategory(category));
+  }, [category, startGame]);
 
   if (phase === 'result') {
     return (
@@ -573,7 +543,7 @@ export default function PyramidGame({ onHome }: Props) {
             <span className="text-yellow-400">F1</span>{' '}
             <span className="text-white">PYRAMID</span>
           </span>
-          <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-widest">{category.shortLabel}</span>
+          <span className="text-[10px] text-gray-500 font-semibold">Categoría: {category.label}</span>
         </div>
         <div className="w-16" />
       </header>
@@ -608,6 +578,7 @@ export default function PyramidGame({ onHome }: Props) {
               onCheck={handleCheck}
               onReveal={handleReveal}
               checkResult={checkResult}
+              checkUsed={checkUsed}
             />
           )}
         </div>
