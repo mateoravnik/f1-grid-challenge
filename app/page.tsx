@@ -1,12 +1,15 @@
 import { Suspense } from 'react';
 import GameContainer from '@/components/GameContainer';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-[#0a0a0a] flex flex-col">
-      <Suspense fallback={<LoadingScreen />}>
-        <GameContainer />
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<LoadingScreen />}>
+          <GameContainer />
+        </Suspense>
+      </ErrorBoundary>
     </main>
   );
 }

@@ -203,6 +203,11 @@ export default function GameContainer() {
   const [tttState, setTttState] = useState<TicTacToeState | null>(null);
   const shakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Refs for stable callbacks — always reflect latest state without recreating functions
+  const gameDataRef = useRef<GameData | null>(null);
+  const tttStateRef = useRef<TicTacToeState | null>(null);
+  gameDataRef.current = gameData;
+  tttStateRef.current = tttState;
 
   // Fetch grid data on mount
   useEffect(() => {
@@ -240,15 +245,21 @@ export default function GameContainer() {
     setTttState(prev => prev ? { ...prev, aiThinking: true } : prev);
 
     aiTimerRef.current = setTimeout(() => {
-      const move = findAiMove(snap, grid);
-      setTttState(prev => {
-        if (!prev) return prev;
-        if (!move) {
-          // No valid cell for AI — pass turn back to player
-          return { ...prev, aiThinking: false, currentPlayer: 'X' };
-        }
-        return applyMove(prev, move.row, move.col, move.driverId);
-      });
+      try {
+        const move = findAiMove(snap, grid);
+        setTttState(prev => {
+          if (!prev) return prev;
+          if (prev.winner !== null) return { ...prev, aiThinking: false };
+          if (!move) {
+            // No valid cell for AI — pass turn back to player
+            return { ...prev, aiThinking: false, currentPlayer: 'X' };
+          }
+          return applyMove(prev, move.row, move.col, move.driverId);
+        });
+      } catch (err) {
+        console.error('[F1] AI move error:', err);
+        setTttState(prev => prev ? { ...prev, aiThinking: false, currentPlayer: 'X' } : prev);
+      }
     }, 1200);
 
     return () => {
@@ -299,17 +310,23 @@ export default function GameContainer() {
   }, [gameData]);
 
   const handleAnswer = useCallback((row: number, col: number, driverId: string) => {
+    const gameData = gameDataRef.current;
+    const tttState = tttStateRef.current;
     if (!gameData || !tttState) return;
     if (tttState.winner !== null) return;
-    if (tttState.board[row][col]) return;
+    if (tttState.board[row]?.[col]) return;
 
     const cellValidIds = gameData.grid.cells[row]?.[col]?.validDriverIds ?? [];
     const isValid = cellValidIds.includes(driverId) && !tttState.usedDriverIds.has(driverId);
 
     if (isValid) {
-      setTttState(prev => prev ? applyMove(prev, row, col, driverId) : prev);
+      setTttState(prev => {
+        if (!prev || prev.winner !== null || prev.board[row]?.[col]) return prev;
+        return applyMove(prev, row, col, driverId);
+      });
     } else {
       // Wrong answer — shake cell, lose turn
+      if (shakeTimerRef.current) clearTimeout(shakeTimerRef.current);
       setTttState(prev => prev ? { ...prev, shakeCell: [row, col] } : prev);
       shakeTimerRef.current = setTimeout(() => {
         setTttState(prev => {
@@ -318,7 +335,8 @@ export default function GameContainer() {
         });
       }, 650);
     }
-  }, [gameData, tttState]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleNewGame = useCallback(() => {
     if (shakeTimerRef.current) clearTimeout(shakeTimerRef.current);

@@ -218,7 +218,7 @@ export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: P
 
                 {/* Cells */}
                 {grid.cols.map((_, ci) => {
-                  const entry = board[ri][ci];
+                  const entry = board[ri]?.[ci] ?? null;
                   const isWinCell = winSet.has(`${ri},${ci}`);
                   const isShaking = shakeCell?.[0] === ri && shakeCell?.[1] === ci;
                   const p = entry?.player;
