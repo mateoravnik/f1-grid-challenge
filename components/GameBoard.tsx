@@ -10,6 +10,7 @@ interface Props {
   onAnswer: (row: number, col: number, driverId: string) => void;
   onReveal: (row: number, col: number) => void;
   onNewGame: () => void;
+  onHome: () => void;
 }
 
 // Direct Wikimedia Commons URLs for team logos (stable SVG→PNG renders)
@@ -93,7 +94,7 @@ function TeamHeader({ id, label, shortLabel, vertical = false }: { id: string; l
   );
 }
 
-export default function GameBoard({ gameData, tttState, onAnswer, onReveal, onNewGame }: Props) {
+export default function GameBoard({ gameData, tttState, onAnswer, onReveal, onNewGame, onHome }: Props) {
   const [activeCell, setActiveCell] = useState<[number, number] | null>(null);
   const [driverPhotos, setDriverPhotos] = useState<Record<string, string | null>>({});
   const fetchedIds = useRef<Set<string>>(new Set());
@@ -160,6 +161,12 @@ export default function GameBoard({ gameData, tttState, onAnswer, onReveal, onNe
       {/* Header */}
       <header className="border-b border-[#2a2a2a] px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <button
+            onClick={onHome}
+            className="text-xs text-gray-500 hover:text-white transition-colors font-semibold uppercase tracking-widest flex items-center gap-1"
+          >
+            ← Inicio
+          </button>
           <div className="text-xl sm:text-2xl font-black tracking-tight">
             <span className="text-[#e10600]">F1</span>{' '}
             <span className="text-white">GRID</span>{' '}

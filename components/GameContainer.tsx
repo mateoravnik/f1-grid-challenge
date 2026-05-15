@@ -265,7 +265,11 @@ function applyReveal(state: TicTacToeState, row: number, col: number, driverId: 
 // ---------------------------------------------------------------------------
 type AppPhase = 'loading' | 'error' | 'mode-select' | 'playing';
 
-export default function GameContainer() {
+interface GameContainerProps {
+  onHome?: () => void;
+}
+
+export default function GameContainer({ onHome }: GameContainerProps = {}) {
   const [phase, setPhase] = useState<AppPhase>('loading');
   const [error, setError] = useState<string | null>(null);
   const [gameData, setGameData] = useState<GameData | null>(null);
@@ -451,6 +455,7 @@ export default function GameContainer() {
       onAnswer={handleAnswer}
       onReveal={handleReveal}
       onNewGame={handleNewGame}
+      onHome={onHome ?? (() => {})}
     />
   );
 }
