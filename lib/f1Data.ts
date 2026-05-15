@@ -43,7 +43,7 @@ const WINS_OVER_TEN_DRIVERS = new Set([
   'hamilton', 'schumacher', 'senna', 'prost', 'vettel', 'alonso',
   'mansell', 'hill', 'piquet', 'lauda', 'hakkinen', 'coulthard',
   'barrichello', 'rosberg', 'reutemann', 'fittipaldi', 'max_verstappen',
-  'villeneuve', 'button', 'massa',
+  'villeneuve', 'button', 'massa', 'fangio',
 ]);
 
 export const CONSTRUCTOR_POOL = [
@@ -184,6 +184,10 @@ const FALLBACK_DRIVERS: FallbackRow[] = [
   ['schumacher_m',        'Mick',          'Schumacher',    'German',        ['haas'],                                               false, false, false, false, false, false, false],
   ['gutierrez_e',         'Esteban',       'Gutiérrez',     'Mexican',       ['haas'],                                               false, false, false, false, true,  false, true],
   ['sato_t',              'Takuma',        'Sato',          'Japanese',      ['bar','jordan'],                                        false, false, false, true,  false, true,  false],
+  // Argentine drivers
+  ['fangio',              'Juan Manuel',   'Fangio',        'Argentine',     ['alfa_romeo','mercedes','ferrari'],                     true,  true,  false, false, false, false, true],
+  ['gonzalez_jf',         'José Froilán',  'González',      'Argentine',     ['ferrari'],                                            false, true,  false, false, false, false, true],
+  ['colapinto',           'Franco',        'Colapinto',     'Argentine',     ['williams','alpine'],                                  false, false, false, false, false, false, true],
 ];
 
 function buildFallbackDriverMap(): Map<string, DriverProfile> {

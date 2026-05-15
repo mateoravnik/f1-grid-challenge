@@ -86,12 +86,32 @@ export function generateDailyGrid(
 
   // Try different seeds until we find a valid grid (min 3 valid drivers per cell)
   const MIN_VALID = 3;
+
+  // Pre-filter: only include conditions where enough total drivers match.
+  // This removes sparse new constructors (alphatauri, aston_martin, etc.) from the
+  // generation pool so the algorithm finds valid grids quickly.
+  const MIN_POOL_COVERAGE = 5;
+  const condArg = (c: ConditionDef) =>
+    c.type === 'constructor' ? { type: 'constructor', id: c.id } : { type: 'special', id: c.id };
+
+  const filteredConditions = allConditions.filter(cond => {
+    let count = 0;
+    for (const driver of drivers.values()) {
+      if (driverMatchesCondition(driver, condArg(cond))) {
+        count++;
+        if (count >= MIN_POOL_COVERAGE) return true;
+      }
+    }
+    return false;
+  });
+  const pool = filteredConditions.length >= 6 ? filteredConditions : allConditions;
+
   let attempt = 0;
 
-  while (attempt < 500) {
+  while (attempt < 1500) {
     const trialSeed = (baseSeed + attempt * 7919) >>> 0;
     const trialRng = seededRng(trialSeed);
-    const shuffled = shuffleWithRng(allConditions, trialRng);
+    const shuffled = shuffleWithRng(pool, trialRng);
 
     // Ensure at least 2 constructors in rows and 2 in columns for variety
     const chosen = shuffled.slice(0, 6);
@@ -124,7 +144,7 @@ export function generateDailyGrid(
   }
 
   // Fallback: return best partial grid (shouldn't happen with good data)
-  throw new Error('Could not generate a valid grid after 500 attempts');
+  throw new Error('Could not generate a valid grid after 1500 attempts');
 }
 
 export { getDateKey };
