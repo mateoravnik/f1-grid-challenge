@@ -9,12 +9,13 @@ export async function GET() {
     const { drivers, fetchedAt } = await getF1Data();
     const grid = generateDailyGrid(drivers);
 
-    const driverLookup: Record<string, { fullName: string; initials: string; nationality: string }> = {};
+    const driverLookup: Record<string, { fullName: string; initials: string; nationality: string; nationalityCode: string }> = {};
     for (const [id, driver] of drivers) {
       driverLookup[id] = {
         fullName: driver.fullName,
         initials: `${driver.givenName[0] ?? ''}${driver.familyName[0] ?? ''}`,
         nationality: driver.nationality,
+        nationalityCode: driver.nationalityCode,
       };
     }
 

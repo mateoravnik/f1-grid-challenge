@@ -37,6 +37,7 @@ export interface DriverLookup {
   fullName: string;
   initials: string;
   nationality: string;
+  nationalityCode: string;
 }
 
 export interface DriverListItem {

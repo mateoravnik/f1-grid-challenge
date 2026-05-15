@@ -11,68 +11,50 @@ interface Props {
   onNewGame: () => void;
 }
 
-// ISO 3166-1 alpha-2 codes for flagcdn.com: https://flagcdn.com/24x18/{code}.png
-// Only specific countries — no regional codes like EU or LATAM (they don't exist in ISO 3166-1)
-const NATIONALITY_FLAG_CODES: Record<string, string> = {
-  'Argentine': 'ar', 'German': 'de', 'Brazilian': 'br', 'British': 'gb',
-  'Finnish': 'fi', 'French': 'fr', 'Spanish': 'es', 'Australian': 'au',
-  'Canadian': 'ca', 'Monegasque': 'mc', 'Dutch': 'nl', 'Mexican': 'mx',
-  'Italian': 'it', 'Austrian': 'at', 'Swiss': 'ch', 'Belgian': 'be',
-  'Swedish': 'se', 'Polish': 'pl', 'Danish': 'dk', 'Russian': 'ru',
-  'Portuguese': 'pt', 'Hungarian': 'hu', 'Colombian': 'co', 'Venezuelan': 've',
-  'South African': 'za', 'Japanese': 'jp', 'American': 'us', 'Thai': 'th',
-  'New Zealander': 'nz', 'Irish': 'ie',
+// Team badge colors: background + text per CONSTRUCTOR_POOL id
+const TEAM_BADGE: Record<string, { bg: string; color: string }> = {
+  ferrari:       { bg: '#DC0000', color: '#fff' },
+  mclaren:       { bg: '#FF8000', color: '#fff' },
+  red_bull:      { bg: '#3671C6', color: '#fff' },
+  mercedes:      { bg: '#00D2BE', color: '#000' },
+  williams:      { bg: '#005AFF', color: '#fff' },
+  renault:       { bg: '#FFF500', color: '#000' },
+  lotus_f1:      { bg: '#FFB800', color: '#000' },
+  alpine:        { bg: '#FF87BC', color: '#fff' },
+  brabham:       { bg: '#1A3C8F', color: '#fff' },
+  tyrrell:       { bg: '#002B5E', color: '#fff' },
+  benetton:      { bg: '#00A651', color: '#fff' },
+  jordan:        { bg: '#F5A800', color: '#000' },
+  bar:           { bg: '#C8102E', color: '#fff' },
+  bmw_sauber:    { bg: '#0066B2', color: '#fff' },
+  force_india:   { bg: '#FF80C7', color: '#000' },
+  toro_rosso:    { bg: '#C81326', color: '#fff' },
+  haas:          { bg: '#B6BABD', color: '#000' },
+  alphatauri:    { bg: '#2B4562', color: '#fff' },
+  aston_martin:  { bg: '#358C75', color: '#fff' },
+  alfa_romeo:    { bg: '#B12335', color: '#fff' },
 };
 
-// Drivers whose Wikipedia article slug differs from their display name
+// Wikipedia slugs that need disambiguation
 const WIKIPEDIA_SLUG_OVERRIDES: Record<string, string> = {
-  'sainz': 'Carlos_Sainz_Jr.',
+  'alonso':  'Fernando_Alonso_(racing_driver)',
+  'sainz':   'Carlos_Sainz_Jr.',
+  'russell': 'George_Russell_(racing_driver)',
+  'webber':  'Mark_Webber_(racing_driver)',
+  'watson':  'John_Watson_(racing_driver)',
 };
 
 const PLAYER_COLORS: Record<Player, { bg: string; border: string; text: string; ring: string; label: string }> = {
-  X: {
-    bg: 'bg-red-900/70',
-    border: 'border-red-600',
-    text: 'text-[#e10600]',
-    ring: 'ring-2 ring-[#e10600]',
-    label: 'Jugador X',
-  },
-  O: {
-    bg: 'bg-blue-900/70',
-    border: 'border-blue-500',
-    text: 'text-blue-400',
-    ring: 'ring-2 ring-blue-500',
-    label: 'Jugador O',
-  },
+  X: { bg: 'bg-red-900/70', border: 'border-red-600', text: 'text-[#e10600]', ring: 'ring-2 ring-[#e10600]', label: 'Jugador X' },
+  O: { bg: 'bg-blue-900/70', border: 'border-blue-500', text: 'text-blue-400', ring: 'ring-2 ring-blue-500', label: 'Jugador O' },
 };
 
 export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: Props) {
   const [activeCell, setActiveCell] = useState<[number, number] | null>(null);
   const [driverPhotos, setDriverPhotos] = useState<Record<string, string | null>>({});
-  const [teamLogos, setTeamLogos] = useState<Record<string, string | null>>({});
   const fetchedIds = useRef<Set<string>>(new Set());
-  const fetchedTeamSlugs = useRef<Set<string>>(new Set());
   const { grid, driverLookup, driverList } = gameData;
   const { board, currentPlayer, winner, winLine, aiThinking, shakeCell, mode } = tttState;
-
-  // Fetch Wikipedia logos for team headers
-  useEffect(() => {
-    const allConditions = [...grid.rows, ...grid.cols];
-    for (const cond of allConditions) {
-      if (cond.type !== 'constructor' || !cond.wikiSlug) continue;
-      const slug = cond.wikiSlug;
-      if (fetchedTeamSlugs.current.has(slug)) continue;
-      fetchedTeamSlugs.current.add(slug);
-      fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(slug)}`)
-        .then(r => r.ok ? r.json() : null)
-        .then((data: { thumbnail?: { source?: string } } | null) => {
-          setTeamLogos(prev => ({ ...prev, [cond.id]: data?.thumbnail?.source ?? null }));
-        })
-        .catch(() => {
-          setTeamLogos(prev => ({ ...prev, [cond.id]: null }));
-        });
-    }
-  }, [grid]);
 
   // Fetch Wikipedia photos for drivers as they fill cells
   useEffect(() => {
@@ -188,56 +170,46 @@ export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: P
             <div />
 
             {/* Column headers */}
-            {grid.cols.map((col, ci) => (
-              <div
-                key={ci}
-                className="flex flex-col items-center justify-center rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-1 py-2 sm:py-3 min-h-[72px] gap-1.5"
-              >
-                {teamLogos[col.id] ? (
-                  <div className="bg-white rounded-md flex items-center justify-center p-1" style={{ width: 48, height: 48 }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={teamLogos[col.id]!}
-                      alt={col.label}
-                      className="object-contain"
-                      style={{ maxWidth: 40, maxHeight: 40 }}
-                    />
+            {grid.cols.map((col, ci) => {
+              const badge = TEAM_BADGE[col.id] ?? { bg: '#2a2a2a', color: '#9ca3af' };
+              return (
+                <div
+                  key={ci}
+                  className="flex flex-col items-center justify-center rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-1 py-2 sm:py-3 min-h-[72px] gap-1.5"
+                >
+                  <div
+                    className="rounded-md flex items-center justify-center text-[10px] font-black text-center px-1"
+                    style={{ width: 48, height: 48, backgroundColor: badge.bg, color: badge.color }}
+                  >
+                    {col.shortLabel ?? ''}
                   </div>
-                ) : (
-                  <div className="bg-[#2a2a2a] rounded-md flex items-center justify-center text-gray-500 text-xs font-black" style={{ width: 48, height: 48 }}>
-                    {(col.shortLabel ?? '').slice(0, 3)}
-                  </div>
-                )}
-                <span className="text-[10px] sm:text-[11px] font-bold text-center leading-tight text-gray-300 uppercase tracking-wide">
-                  {col.shortLabel}
-                </span>
-              </div>
-            ))}
+                  <span className="text-[10px] sm:text-[11px] font-bold text-center leading-tight text-gray-300 uppercase tracking-wide">
+                    {col.label}
+                  </span>
+                </div>
+              );
+            })}
 
             {/* Rows */}
             {grid.rows.map((row, ri) => (
               <React.Fragment key={`row-${ri}`}>
                 {/* Row header */}
-                <div className="flex flex-col items-center justify-center gap-1.5 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-1 py-2 min-h-[90px] sm:min-h-[110px] min-w-[60px] sm:min-w-[72px]">
-                  {teamLogos[row.id] ? (
-                    <div className="bg-white rounded-md flex items-center justify-center p-1 flex-shrink-0" style={{ width: 48, height: 48 }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={teamLogos[row.id]!}
-                        alt={row.label}
-                        className="object-contain"
-                        style={{ maxWidth: 40, maxHeight: 40 }}
-                      />
+                {(() => {
+                  const badge = TEAM_BADGE[row.id] ?? { bg: '#2a2a2a', color: '#9ca3af' };
+                  return (
+                    <div className="flex flex-col items-center justify-center gap-1.5 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-1 py-2 min-h-[90px] sm:min-h-[110px] min-w-[60px] sm:min-w-[72px]">
+                      <div
+                        className="rounded-md flex items-center justify-center text-[10px] font-black text-center px-1 flex-shrink-0"
+                        style={{ width: 48, height: 48, backgroundColor: badge.bg, color: badge.color }}
+                      >
+                        {row.shortLabel ?? ''}
+                      </div>
+                      <span className="text-[10px] sm:text-[11px] font-bold text-center leading-tight text-gray-300 uppercase tracking-wide [writing-mode:vertical-rl] rotate-180 sm:[writing-mode:horizontal-tb] sm:rotate-0">
+                        {row.label}
+                      </span>
                     </div>
-                  ) : (
-                    <div className="bg-[#2a2a2a] rounded-md flex items-center justify-center text-gray-500 text-xs font-black flex-shrink-0" style={{ width: 48, height: 48 }}>
-                      {(row.shortLabel ?? '').slice(0, 3)}
-                    </div>
-                  )}
-                  <span className="text-[10px] sm:text-[11px] font-bold text-center leading-tight text-gray-300 uppercase tracking-wide [writing-mode:vertical-rl] rotate-180 sm:[writing-mode:horizontal-tb] sm:rotate-0">
-                    {row.shortLabel}
-                  </span>
-                </div>
+                  );
+                })()}
 
                 {/* Cells */}
                 {grid.cols.map((_, ci) => {
@@ -288,10 +260,10 @@ export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: P
                           )}
                           {/* Driver name + flag */}
                           <div className={`mt-1 text-[9px] sm:text-[10px] font-bold text-center leading-tight line-clamp-2 flex items-center justify-center gap-0.5 ${p ? PLAYER_COLORS[p].text : 'text-gray-300'}`}>
-                            {NATIONALITY_FLAG_CODES[driverInfo.nationality] && (
+                            {driverInfo.nationalityCode && (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
-                                src={`https://flagcdn.com/24x18/${NATIONALITY_FLAG_CODES[driverInfo.nationality]}.png`}
+                                src={`https://flagcdn.com/24x18/${driverInfo.nationalityCode}.png`}
                                 alt={driverInfo.nationality}
                                 width={12}
                                 height={9}
