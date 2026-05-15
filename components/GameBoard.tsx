@@ -251,13 +251,16 @@ export default function GameBoard({ gameData, tttState, onAnswer, onReveal, onNe
                   const isWinCell = winSet.has(`${ri},${ci}`);
                   const isShaking = shakeCell?.[0] === ri && shakeCell?.[1] === ci;
                   const p = entry?.player;
-                  const isRevealed = entry?.revealed ?? false;
+                  const isRevealed = (entry?.revealed ?? false) && !entry?.noSolution;
+                  const isNoSolution = entry?.noSolution ?? false;
                   const driverInfo = entry?.driverId ? driverLookup[entry.driverId] : null;
                   const blocked = gameOver || (isAiTurn && !entry);
 
                   // Cell background/border classes
                   let cellClass = 'relative flex flex-col items-center justify-center rounded-xl border-2 transition-all duration-200 min-h-[90px] sm:min-h-[110px] p-2 select-none ';
-                  if (isRevealed) {
+                  if (isNoSolution) {
+                    cellClass += 'bg-[#1a1a1a] border-[#2a2a2a]';
+                  } else if (isRevealed) {
                     cellClass += 'bg-[#1e1e1e] border-[#3a3a3a]';
                   } else if (isWinCell) {
                     cellClass += `${p ? PLAYER_COLORS[p].bg : ''} ${p ? PLAYER_COLORS[p].border : ''} scale-105 shadow-lg`;
@@ -278,7 +281,13 @@ export default function GameBoard({ gameData, tttState, onAnswer, onReveal, onNe
                       disabled={!!entry || blocked}
                       className={cellClass}
                     >
-                      {isRevealed && driverInfo ? (
+                      {isNoSolution ? (
+                        // No valid drivers left — cell blocked
+                        <>
+                          <div className="text-2xl leading-none">🚫</div>
+                          <div className="text-[9px] font-bold text-gray-600 mt-1 uppercase tracking-wider">Sin opciones</div>
+                        </>
+                      ) : isRevealed && driverInfo ? (
                         // Revealed: neutral gray, no player symbol
                         <>
                           <div className="text-[9px] font-bold text-gray-600 mb-1 uppercase tracking-wider">Revelado</div>

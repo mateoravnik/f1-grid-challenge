@@ -193,8 +193,11 @@ function mergeApiData(
     const staticData = STATIC_DRIVER_MAP.get(id);
     merged.set(id, {
       ...driver,
+      // Merge API constructors with static ones — never discard static data
+      // (Ergast uses different IDs like 'alfa' vs our 'alfa_romeo', so API calls
+      //  for some constructors return empty; static data fills the gaps)
       constructors: apiConstructors && apiConstructors.length > 0
-        ? apiConstructors
+        ? [...new Set([...(staticData?.constructors ?? []), ...apiConstructors])]
         : driver.constructors,
       // OR with static so partial API failures don't erase known data
       isChampion: champions.has(id) || (staticData?.isChampion ?? false),

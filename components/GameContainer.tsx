@@ -18,7 +18,8 @@ export type { GridDifficulty };
 export interface CellEntry {
   player: Player;
   driverId: string;
-  revealed?: boolean;   // neutral reveal — counts for neither player
+  revealed?: boolean;    // neutral reveal — counts for neither player
+  noSolution?: boolean;  // no valid drivers left — turn passes, cell shown as blocked
 }
 
 export interface TicTacToeState {
@@ -232,6 +233,31 @@ function applyMove(state: TicTacToeState, row: number, col: number, driverId: st
 }
 
 // ---------------------------------------------------------------------------
+// Apply a no-solution mark (no valid drivers left — neutral, turn passes)
+// ---------------------------------------------------------------------------
+function applyNoSolution(state: TicTacToeState, row: number, col: number): TicTacToeState {
+  const newBoard = state.board.map((r, ri) =>
+    r.map((c, ci) =>
+      ri === row && ci === col
+        ? { player: state.currentPlayer, driverId: '', revealed: true, noSolution: true }
+        : c
+    )
+  );
+  const winResult = checkWinner(newBoard as (CellEntry | null)[][]);
+  const full = boardFull(newBoard as (CellEntry | null)[][]);
+  return {
+    ...state,
+    board: newBoard as (CellEntry | null)[][],
+    currentPlayer: state.currentPlayer === 'X' ? 'O' : 'X',
+    winner: winResult ? winResult.winner : full ? 'draw' : null,
+    winLine: winResult ? winResult.line : null,
+    aiThinking: false,
+    shakeCell: null,
+    wrongStreak: null,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Apply a reveal (neutral — neither player scores the cell)
 // ---------------------------------------------------------------------------
 function applyReveal(state: TicTacToeState, row: number, col: number, driverId: string): TicTacToeState {
@@ -408,7 +434,15 @@ export default function GameContainer({ onHome }: GameContainerProps = {}) {
 
     const validIds = gameData.grid.cells[row]?.[col]?.validDriverIds ?? [];
     const unusedValid = validIds.filter(id => !tttState.usedDriverIds.has(id));
-    if (unusedValid.length === 0) return;
+
+    if (unusedValid.length === 0) {
+      // No valid drivers left — mark cell as no-solution and pass the turn
+      setTttState(prev => {
+        if (!prev || prev.winner !== null || prev.board[row]?.[col]) return prev;
+        return applyNoSolution(prev, row, col);
+      });
+      return;
+    }
 
     const driverId = unusedValid[0];
     setTttState(prev => {

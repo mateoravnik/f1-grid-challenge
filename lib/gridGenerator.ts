@@ -89,7 +89,7 @@ export function generateDailyGrid(
 
   // MIN_VALID and MIN_POOL_COVERAGE vary by grid difficulty
   // easy: many options per cell (6+), medium: moderate (3+), hard: few (1+)
-  const MIN_VALID = gridDifficulty === 'easy' ? 6 : gridDifficulty === 'hard' ? 1 : 3;
+  const MIN_VALID = gridDifficulty === 'easy' ? 6 : 3; // minimum 3 for all difficulties
   const MIN_POOL_COVERAGE = gridDifficulty === 'easy' ? 10 : gridDifficulty === 'hard' ? 3 : 5;
   const condArg = (c: ConditionDef) =>
     c.type === 'constructor' ? { type: 'constructor', id: c.id } : { type: 'special', id: c.id };
