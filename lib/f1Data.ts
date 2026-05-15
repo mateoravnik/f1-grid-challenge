@@ -71,7 +71,7 @@ export const CONSTRUCTOR_POOL = [
 
 export const SPECIAL_CONDITIONS = [
   { id: 'champion',    label: 'Campeón del Mundo',        shortLabel: '🏆 Campeón' },
-  { id: 'raceWinner',  label: 'Ganó al menos 1 carrera',  shortLabel: '🏁 Ganador' },
+  { id: 'raceWinner',  label: 'Ganó al menos 1 GP',       shortLabel: '🏁 1+ victorias' },
   { id: 'noWin',       label: 'Nunca ganó una carrera',   shortLabel: '❌ Sin victoria' },
   { id: 'nineties',    label: 'Corrió en los 90s',        shortLabel: '📅 90s' },
   { id: 'zeroes',      label: 'Corrió en los 2000s',      shortLabel: '📅 2000s' },
@@ -380,8 +380,9 @@ function mergeApiData(
     merged.set(id, {
       ...driver,
       constructors,
-      isChampion: champions.has(id),
-      isRaceWinner: raceWinners.has(id),
+      // OR with fallback so a partial API failure doesn't silently erase known winners/champions
+      isChampion: champions.has(id) || (fallback?.isChampion ?? false),
+      isRaceWinner: raceWinners.has(id) || (fallback?.isRaceWinner ?? false),
       racedIn90s: nineties.has(id),
       racedIn2000s: KNOWN_2000s_DRIVERS.has(id) || (fallback?.racedIn2000s ?? false),
       racedIn2010s: KNOWN_2010s_DRIVERS.has(id) || (fallback?.racedIn2010s ?? false),

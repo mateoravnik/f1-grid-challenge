@@ -11,15 +11,16 @@ interface Props {
   onNewGame: () => void;
 }
 
-const NATIONALITY_FLAGS: Record<string, string> = {
-  'Argentine': '🇦🇷', 'German': '🇩🇪', 'Brazilian': '🇧🇷', 'British': '🇬🇧',
-  'Finnish': '🇫🇮', 'French': '🇫🇷', 'Spanish': '🇪🇸', 'Australian': '🇦🇺',
-  'Canadian': '🇨🇦', 'Monegasque': '🇲🇨', 'Dutch': '🇳🇱', 'Mexican': '🇲🇽',
-  'Italian': '🇮🇹', 'Austrian': '🇦🇹', 'Swiss': '🇨🇭', 'Belgian': '🇧🇪',
-  'Swedish': '🇸🇪', 'Polish': '🇵🇱', 'Danish': '🇩🇰', 'Russian': '🇷🇺',
-  'Portuguese': '🇵🇹', 'Hungarian': '🇭🇺', 'Colombian': '🇨🇴', 'Venezuelan': '🇻🇪',
-  'South African': '🇿🇦', 'Japanese': '🇯🇵', 'American': '🇺🇸', 'Thai': '🇹🇭',
-  'New Zealander': '🇳🇿', 'Irish': '🇮🇪',
+// ISO 3166-1 alpha-2 codes for flagcdn.com: https://flagcdn.com/24x18/{code}.png
+const NATIONALITY_FLAG_CODES: Record<string, string> = {
+  'Argentine': 'ar', 'German': 'de', 'Brazilian': 'br', 'British': 'gb',
+  'Finnish': 'fi', 'French': 'fr', 'Spanish': 'es', 'Australian': 'au',
+  'Canadian': 'ca', 'Monegasque': 'mc', 'Dutch': 'nl', 'Mexican': 'mx',
+  'Italian': 'it', 'Austrian': 'at', 'Swiss': 'ch', 'Belgian': 'be',
+  'Swedish': 'se', 'Polish': 'pl', 'Danish': 'dk', 'Russian': 'ru',
+  'Portuguese': 'pt', 'Hungarian': 'hu', 'Colombian': 'co', 'Venezuelan': 've',
+  'South African': 'za', 'Japanese': 'jp', 'American': 'us', 'Thai': 'th',
+  'New Zealander': 'nz', 'Irish': 'ie',
 };
 
 const PLAYER_COLORS: Record<Player, { bg: string; border: string; text: string; ring: string; label: string }> = {
@@ -184,16 +185,24 @@ export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: P
             {grid.cols.map((col, ci) => (
               <div
                 key={ci}
-                className="flex flex-col items-center justify-center rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-1 py-2 sm:py-3 min-h-[48px] gap-1"
+                className="flex flex-col items-center justify-center rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-1 py-2 sm:py-3 min-h-[72px] gap-1.5"
               >
-                {teamLogos[col.id] && (
-                  <img
-                    src={teamLogos[col.id]!}
-                    alt={col.label}
-                    className="w-7 h-7 object-contain rounded"
-                  />
+                {teamLogos[col.id] ? (
+                  <div className="bg-white rounded-md flex items-center justify-center p-1" style={{ width: 48, height: 48 }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={teamLogos[col.id]!}
+                      alt={col.label}
+                      className="object-contain"
+                      style={{ maxWidth: 40, maxHeight: 40 }}
+                    />
+                  </div>
+                ) : (
+                  <div className="bg-[#2a2a2a] rounded-md flex items-center justify-center text-gray-500 text-xs font-black" style={{ width: 48, height: 48 }}>
+                    {col.shortLabel.slice(0, 3)}
+                  </div>
                 )}
-                <span className="text-[10px] sm:text-xs font-bold text-center leading-tight text-gray-300 uppercase tracking-wide">
+                <span className="text-[10px] sm:text-[11px] font-bold text-center leading-tight text-gray-300 uppercase tracking-wide">
                   {col.shortLabel}
                 </span>
               </div>
@@ -203,15 +212,23 @@ export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: P
             {grid.rows.map((row, ri) => (
               <React.Fragment key={`row-${ri}`}>
                 {/* Row header */}
-                <div className="flex flex-col items-center justify-center gap-1 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-1 py-2 min-h-[90px] sm:min-h-[110px] min-w-[48px] sm:min-w-[60px]">
-                  {teamLogos[row.id] && (
-                    <img
-                      src={teamLogos[row.id]!}
-                      alt={row.label}
-                      className="w-7 h-7 object-contain rounded"
-                    />
+                <div className="flex flex-col items-center justify-center gap-1.5 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-1 py-2 min-h-[90px] sm:min-h-[110px] min-w-[60px] sm:min-w-[72px]">
+                  {teamLogos[row.id] ? (
+                    <div className="bg-white rounded-md flex items-center justify-center p-1 flex-shrink-0" style={{ width: 48, height: 48 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={teamLogos[row.id]!}
+                        alt={row.label}
+                        className="object-contain"
+                        style={{ maxWidth: 40, maxHeight: 40 }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="bg-[#2a2a2a] rounded-md flex items-center justify-center text-gray-500 text-xs font-black flex-shrink-0" style={{ width: 48, height: 48 }}>
+                      {row.shortLabel.slice(0, 3)}
+                    </div>
                   )}
-                  <span className="text-[10px] sm:text-xs font-bold text-center leading-tight text-gray-300 uppercase tracking-wide [writing-mode:vertical-rl] rotate-180 sm:[writing-mode:horizontal-tb] sm:rotate-0">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-center leading-tight text-gray-300 uppercase tracking-wide [writing-mode:vertical-rl] rotate-180 sm:[writing-mode:horizontal-tb] sm:rotate-0">
                     {row.shortLabel}
                   </span>
                 </div>
@@ -264,8 +281,17 @@ export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: P
                             </div>
                           )}
                           {/* Driver name + flag */}
-                          <div className={`mt-1 text-[9px] sm:text-[10px] font-bold text-center leading-tight line-clamp-2 ${p ? PLAYER_COLORS[p].text : 'text-gray-300'}`}>
-                            {NATIONALITY_FLAGS[driverInfo.nationality] ?? ''}{' '}
+                          <div className={`mt-1 text-[9px] sm:text-[10px] font-bold text-center leading-tight line-clamp-2 flex items-center justify-center gap-0.5 ${p ? PLAYER_COLORS[p].text : 'text-gray-300'}`}>
+                            {NATIONALITY_FLAG_CODES[driverInfo.nationality] && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={`https://flagcdn.com/24x18/${NATIONALITY_FLAG_CODES[driverInfo.nationality]}.png`}
+                                alt={driverInfo.nationality}
+                                width={12}
+                                height={9}
+                                className="inline-block flex-shrink-0"
+                              />
+                            )}
                             {driverInfo.fullName.split(' ').pop()}
                           </div>
                         </>
