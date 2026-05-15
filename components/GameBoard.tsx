@@ -31,9 +31,30 @@ const PLAYER_COLORS: Record<Player, { bg: string; border: string; text: string; 
 export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: Props) {
   const [activeCell, setActiveCell] = useState<[number, number] | null>(null);
   const [driverPhotos, setDriverPhotos] = useState<Record<string, string | null>>({});
+  const [teamLogos, setTeamLogos] = useState<Record<string, string | null>>({});
   const fetchedIds = useRef<Set<string>>(new Set());
+  const fetchedTeamSlugs = useRef<Set<string>>(new Set());
   const { grid, driverLookup, driverList } = gameData;
   const { board, currentPlayer, winner, winLine, aiThinking, shakeCell, mode } = tttState;
+
+  // Fetch Wikipedia logos for team headers
+  useEffect(() => {
+    const allConditions = [...grid.rows, ...grid.cols];
+    for (const cond of allConditions) {
+      if (cond.type !== 'constructor' || !cond.wikiSlug) continue;
+      const slug = cond.wikiSlug;
+      if (fetchedTeamSlugs.current.has(slug)) continue;
+      fetchedTeamSlugs.current.add(slug);
+      fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(slug)}`)
+        .then(r => r.ok ? r.json() : null)
+        .then((data: { thumbnail?: { source?: string } } | null) => {
+          setTeamLogos(prev => ({ ...prev, [cond.id]: data?.thumbnail?.source ?? null }));
+        })
+        .catch(() => {
+          setTeamLogos(prev => ({ ...prev, [cond.id]: null }));
+        });
+    }
+  }, [grid]);
 
   // Fetch Wikipedia photos for drivers as they fill cells
   useEffect(() => {
@@ -152,8 +173,15 @@ export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: P
             {grid.cols.map((col, ci) => (
               <div
                 key={ci}
-                className="flex items-center justify-center rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-1 py-2 sm:py-3 min-h-[48px]"
+                className="flex flex-col items-center justify-center rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-1 py-2 sm:py-3 min-h-[48px] gap-1"
               >
+                {teamLogos[col.id] && (
+                  <img
+                    src={teamLogos[col.id]!}
+                    alt={col.label}
+                    className="w-7 h-7 object-contain rounded"
+                  />
+                )}
                 <span className="text-[10px] sm:text-xs font-bold text-center leading-tight text-gray-300 uppercase tracking-wide">
                   {col.shortLabel}
                 </span>
@@ -164,7 +192,14 @@ export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: P
             {grid.rows.map((row, ri) => (
               <React.Fragment key={`row-${ri}`}>
                 {/* Row header */}
-                <div className="flex items-center justify-center rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-1 py-2 min-h-[90px] sm:min-h-[110px] min-w-[48px] sm:min-w-[60px]">
+                <div className="flex flex-col items-center justify-center gap-1 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-1 py-2 min-h-[90px] sm:min-h-[110px] min-w-[48px] sm:min-w-[60px]">
+                  {teamLogos[row.id] && (
+                    <img
+                      src={teamLogos[row.id]!}
+                      alt={row.label}
+                      className="w-7 h-7 object-contain rounded"
+                    />
+                  )}
                   <span className="text-[10px] sm:text-xs font-bold text-center leading-tight text-gray-300 uppercase tracking-wide [writing-mode:vertical-rl] rotate-180 sm:[writing-mode:horizontal-tb] sm:rotate-0">
                     {row.shortLabel}
                   </span>

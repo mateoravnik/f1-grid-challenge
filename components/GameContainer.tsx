@@ -223,8 +223,9 @@ export default function GameContainer() {
     return () => {
       if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
     };
+  // aiThinking intentionally omitted: including it would cancel the timeout it sets
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tttState?.currentPlayer, tttState?.winner, tttState?.aiThinking, tttState?.mode]);
+  }, [tttState?.currentPlayer, tttState?.winner, tttState?.mode]);
 
   const startGame = useCallback((mode: GameMode) => {
     if (!gameData) return;

@@ -38,8 +38,12 @@ export async function GET() {
       isChampion: d.isChampion,
       isRaceWinner: d.isRaceWinner,
       racedIn90s: d.racedIn90s,
+      racedIn2000s: d.racedIn2000s,
+      racedIn2010s: d.racedIn2010s,
       gpsOver100: d.gpsOver100,
       isLatinAmerican: d.isLatinAmerican,
+      isEuropean: d.isEuropean,
+      winsOver10: d.winsOver10,
     }));
 
     return NextResponse.json({

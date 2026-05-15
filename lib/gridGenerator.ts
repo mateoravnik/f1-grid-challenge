@@ -1,8 +1,8 @@
 import { CONSTRUCTOR_POOL, SPECIAL_CONDITIONS, DriverProfile, driverMatchesCondition } from './f1Data';
 
 export type ConditionDef =
-  | { type: 'constructor'; id: string; label: string; shortLabel: string }
-  | { type: 'special'; id: string; label: string; shortLabel: string };
+  | { type: 'constructor'; id: string; label: string; shortLabel: string; wikiSlug?: string }
+  | { type: 'special'; id: string; label: string; shortLabel: string; wikiSlug?: string };
 
 export interface GridCell {
   row: number;
@@ -73,6 +73,7 @@ export function generateDailyGrid(
     id: c.id,
     label: c.label,
     shortLabel: c.shortLabel,
+    wikiSlug: c.wikiSlug,
   }));
   const specialConditions: ConditionDef[] = SPECIAL_CONDITIONS.map((s) => ({
     type: 'special' as const,
