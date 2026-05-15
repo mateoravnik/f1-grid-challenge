@@ -12,6 +12,7 @@ interface Props {
 }
 
 // ISO 3166-1 alpha-2 codes for flagcdn.com: https://flagcdn.com/24x18/{code}.png
+// Only specific countries — no regional codes like EU or LATAM (they don't exist in ISO 3166-1)
 const NATIONALITY_FLAG_CODES: Record<string, string> = {
   'Argentine': 'ar', 'German': 'de', 'Brazilian': 'br', 'British': 'gb',
   'Finnish': 'fi', 'French': 'fr', 'Spanish': 'es', 'Australian': 'au',
@@ -21,6 +22,11 @@ const NATIONALITY_FLAG_CODES: Record<string, string> = {
   'Portuguese': 'pt', 'Hungarian': 'hu', 'Colombian': 'co', 'Venezuelan': 've',
   'South African': 'za', 'Japanese': 'jp', 'American': 'us', 'Thai': 'th',
   'New Zealander': 'nz', 'Irish': 'ie',
+};
+
+// Drivers whose Wikipedia article slug differs from their display name
+const WIKIPEDIA_SLUG_OVERRIDES: Record<string, string> = {
+  'sainz': 'Carlos_Sainz_Jr.',
 };
 
 const PLAYER_COLORS: Record<Player, { bg: string; border: string; text: string; ring: string; label: string }> = {
@@ -78,7 +84,7 @@ export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: P
         fetchedIds.current.add(driverId);
         const info = driverLookup[driverId];
         if (!info) continue;
-        const slug = info.fullName.trim().replace(/\s+/g, '_');
+        const slug = WIKIPEDIA_SLUG_OVERRIDES[driverId] ?? info.fullName.trim().replace(/\s+/g, '_');
         fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(slug)}`)
           .then(r => r.ok ? r.json() : null)
           .then((data: { thumbnail?: { source?: string } } | null) => {
@@ -199,7 +205,7 @@ export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: P
                   </div>
                 ) : (
                   <div className="bg-[#2a2a2a] rounded-md flex items-center justify-center text-gray-500 text-xs font-black" style={{ width: 48, height: 48 }}>
-                    {col.shortLabel.slice(0, 3)}
+                    {(col.shortLabel ?? '').slice(0, 3)}
                   </div>
                 )}
                 <span className="text-[10px] sm:text-[11px] font-bold text-center leading-tight text-gray-300 uppercase tracking-wide">
@@ -225,7 +231,7 @@ export default function GameBoard({ gameData, tttState, onAnswer, onNewGame }: P
                     </div>
                   ) : (
                     <div className="bg-[#2a2a2a] rounded-md flex items-center justify-center text-gray-500 text-xs font-black flex-shrink-0" style={{ width: 48, height: 48 }}>
-                      {row.shortLabel.slice(0, 3)}
+                      {(row.shortLabel ?? '').slice(0, 3)}
                     </div>
                   )}
                   <span className="text-[10px] sm:text-[11px] font-bold text-center leading-tight text-gray-300 uppercase tracking-wide [writing-mode:vertical-rl] rotate-180 sm:[writing-mode:horizontal-tb] sm:rotate-0">

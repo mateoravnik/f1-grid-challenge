@@ -114,7 +114,8 @@ export function generateDailyGrid(
     const shuffled = shuffleWithRng(pool, trialRng);
 
     // Ensure at least 2 constructors in rows and 2 in columns for variety
-    const chosen = shuffled.slice(0, 6);
+    const safeShuffled = shuffled ?? [];
+    const chosen = safeShuffled.slice(0, 6);
     const rows = chosen.slice(0, 3);
     const cols = chosen.slice(3, 6);
 
