@@ -10,7 +10,9 @@ interface Props {
   driverList: DriverListItem[];
   usedDriverIds: Set<string>;
   currentPlayer: Player;
+  showRevealHint: boolean;
   onSubmit: (driverId: string) => void;
+  onReveal: () => void;
   onClose: () => void;
 }
 
@@ -50,7 +52,8 @@ function fuzzySearch(query: string, drivers: DriverListItem[]): DriverListItem[]
 }
 
 export default function InputModal({
-  rowLabel, colLabel, driverList, usedDriverIds, currentPlayer, onSubmit, onClose,
+  rowLabel, colLabel, driverList, usedDriverIds, currentPlayer,
+  showRevealHint, onSubmit, onReveal, onClose,
 }: Props) {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<DriverListItem[]>([]);
@@ -71,13 +74,9 @@ export default function InputModal({
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Escape') { onClose(); return; }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelected(s => Math.min(s + 1, suggestions.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelected(s => Math.max(s - 1, -1));
-    } else if (e.key === 'Enter') {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setSelected(s => Math.min(s + 1, suggestions.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setSelected(s => Math.max(s - 1, -1)); }
+    else if (e.key === 'Enter') {
       e.preventDefault();
       const target = selected >= 0 ? suggestions[selected] : undefined;
       const only = suggestions.length === 1 ? suggestions[0] : undefined;
@@ -119,12 +118,7 @@ export default function InputModal({
                 </span>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-600 hover:text-white transition-colors text-xl leading-none flex-shrink-0 mt-0.5"
-            >
-              ×
-            </button>
+            <button onClick={onClose} className="text-gray-600 hover:text-white transition-colors text-xl leading-none flex-shrink-0 mt-0.5">×</button>
           </div>
         </div>
 
@@ -152,10 +146,8 @@ export default function InputModal({
                     disabled={used}
                     className={[
                       'w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-left transition-colors text-sm font-semibold',
-                      used
-                        ? 'bg-[#1a1a1a] text-gray-600 cursor-not-allowed'
-                        : selected === i
-                        ? `${selectedBg} text-white`
+                      used ? 'bg-[#1a1a1a] text-gray-600 cursor-not-allowed'
+                        : selected === i ? `${selectedBg} text-white`
                         : 'bg-[#1a1a1a] text-gray-200 hover:bg-[#242424] hover:text-white',
                     ].join(' ')}
                   >
@@ -183,7 +175,25 @@ export default function InputModal({
             </div>
           )}
 
-          <div className="mt-4 text-[10px] text-gray-600 text-center">
+          {/* Reveal hint (auto-shown after 4 consecutive wrong answers) */}
+          {showRevealHint && (
+            <div className="mt-3 flex items-start gap-2 bg-yellow-950/40 border border-yellow-800/50 rounded-xl px-3 py-2.5">
+              <span className="text-lg leading-none flex-shrink-0">💡</span>
+              <span className="text-xs text-yellow-400 font-semibold leading-snug">
+                ¿Quedaste sin ideas? Podés revelar la respuesta y pasar el turno.
+              </span>
+            </div>
+          )}
+
+          {/* Reveal button — always visible */}
+          <button
+            onClick={onReveal}
+            className="mt-3 w-full py-2.5 rounded-xl border border-[#3a3a3a] bg-[#1a1a1a] text-gray-500 hover:text-gray-300 hover:border-[#555] transition-colors text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-1.5"
+          >
+            <span>👁</span> Revelar respuesta y pasar turno
+          </button>
+
+          <div className="mt-3 text-[10px] text-gray-600 text-center">
             ↑↓ navegar · Enter seleccionar · Esc cerrar
           </div>
         </div>

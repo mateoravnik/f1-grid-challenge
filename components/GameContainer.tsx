@@ -18,6 +18,7 @@ export type { GridDifficulty };
 export interface CellEntry {
   player: Player;
   driverId: string;
+  revealed?: boolean;   // neutral reveal — counts for neither player
 }
 
 export interface TicTacToeState {
@@ -31,6 +32,7 @@ export interface TicTacToeState {
   winLine: [number, number][] | null;
   aiThinking: boolean;
   shakeCell: [number, number] | null;
+  wrongStreak: { cell: [number, number]; count: number } | null;
 }
 
 export interface DriverLookup {
@@ -56,28 +58,22 @@ export interface GameData {
 }
 
 // ---------------------------------------------------------------------------
-// Win detection
+// Win detection — revealed cells are neutral, never count toward a win
 // ---------------------------------------------------------------------------
 const WIN_LINES: [number, number][][] = [
-  [[0,0],[0,1],[0,2]],
-  [[1,0],[1,1],[1,2]],
-  [[2,0],[2,1],[2,2]],
-  [[0,0],[1,0],[2,0]],
-  [[0,1],[1,1],[2,1]],
-  [[0,2],[1,2],[2,2]],
-  [[0,0],[1,1],[2,2]],
-  [[0,2],[1,1],[2,0]],
+  [[0,0],[0,1],[0,2]], [[1,0],[1,1],[1,2]], [[2,0],[2,1],[2,2]],
+  [[0,0],[1,0],[2,0]], [[0,1],[1,1],[2,1]], [[0,2],[1,2],[2,2]],
+  [[0,0],[1,1],[2,2]], [[0,2],[1,1],[2,0]],
 ];
 
 function checkWinner(board: (CellEntry | null)[][]): { winner: Player; line: [number, number][] } | null {
   for (const line of WIN_LINES) {
     const [a, b, c] = line as [[number,number],[number,number],[number,number]];
-    const pa = board[a[0]][a[1]]?.player;
-    const pb = board[b[0]][b[1]]?.player;
-    const pc = board[c[0]][c[1]]?.player;
-    if (pa && pa === pb && pa === pc) {
-      return { winner: pa, line: [a, b, c] };
-    }
+    const ca = board[a[0]][a[1]]; const cb = board[b[0]][b[1]]; const cc = board[c[0]][c[1]];
+    const pa = ca?.revealed ? undefined : ca?.player;
+    const pb = cb?.revealed ? undefined : cb?.player;
+    const pc = cc?.revealed ? undefined : cc?.player;
+    if (pa && pa === pb && pa === pc) return { winner: pa, line: [a, b, c] };
   }
   return null;
 }
@@ -111,7 +107,7 @@ function findAiMove(state: TicTacToeState, grid: DailyGrid): AiMove | null {
 
   if (candidates.length === 0) return null;
 
-  // Easy: first available cell, first available driver (deterministic, no strategy)
+  // Easy: first available cell, first available driver
   if (state.aiDifficulty === 'easy') {
     const cell = candidates[0];
     return { row: cell.row, col: cell.col, driverId: cell.drivers[0] };
@@ -123,47 +119,89 @@ function findAiMove(state: TicTacToeState, grid: DailyGrid): AiMove | null {
     driverId: cell.drivers[Math.floor(Math.random() * cell.drivers.length)],
   });
 
-  // Medium: random cell, random driver (no strategy)
+  // Medium: random cell, random driver
   if (state.aiDifficulty === 'medium') {
     return pickRandom(candidates[Math.floor(Math.random() * candidates.length)]);
   }
 
-  // Hard: win if possible, then block, then pick cell that covers most X-threatening lines
-  const simWins = (player: Player): CandidateCell | undefined =>
-    candidates.find(({ row, col }) => {
-      const sim = state.board.map(r => [...r]);
-      sim[row][col] = { player, driverId: '' };
-      return checkWinner(sim as (CellEntry | null)[][])?.winner === player;
-    });
+  // ---------------------------------------------------------------------------
+  // Hard: proper minimax-style strategy
+  // ---------------------------------------------------------------------------
+  const simBoard = (
+    board: (CellEntry | null)[][],
+    row: number, col: number,
+    player: Player
+  ): (CellEntry | null)[][] =>
+    board.map((r, ri) => r.map((c, ci) =>
+      ri === row && ci === col ? { player, driverId: '' } : c
+    ));
 
-  const winning = simWins('O');
+  // 1. Win: can O complete a line this turn?
+  const winning = candidates.find(({ row, col }) =>
+    checkWinner(simBoard(state.board, row, col, 'O'))?.winner === 'O'
+  );
   if (winning) return pickRandom(winning);
 
-  const blocking = simWins('X');
-  if (blocking) return pickRandom(blocking);
+  // 2. Block: check ALL empty cells (not just candidate cells) for immediate X wins
+  const xThreats: [number, number][] = [];
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      if (state.board[r][c]) continue;
+      if (checkWinner(simBoard(state.board, r, c, 'X'))?.winner === 'X')
+        xThreats.push([r, c]);
+    }
+  }
+  if (xThreats.length > 0) {
+    const blocking = candidates.find(({ row, col }) =>
+      xThreats.some(([tr, tc]) => tr === row && tc === col)
+    );
+    if (blocking) return pickRandom(blocking);
+    // Can't block (no valid driver for threat cell) — fall through to best move
+  }
+
+  // 3. Score candidates: penalise moves that gift X an immediate win next turn;
+  //    reward position (center > corners > edges) and building O's own threats
+  const cellPositionScore = (r: number, c: number): number => {
+    if (r === 1 && c === 1) return 10;                              // center
+    if ((r === 0 || r === 2) && (c === 0 || c === 2)) return 6;    // corners
+    return 3;                                                        // edges
+  };
 
   const scored = candidates.map(cell => {
-    let threat = 0;
+    let score = cellPositionScore(cell.row, cell.col);
+
+    // After O plays here, does any empty cell immediately give X the win?
+    const afterO = simBoard(state.board, cell.row, cell.col, 'O');
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        if (afterO[r][c]) continue;
+        const xCanPlay = (grid.cells[r]?.[c]?.validDriverIds ?? [])
+          .some(id => !state.usedDriverIds.has(id));
+        if (xCanPlay && checkWinner(simBoard(afterO, r, c, 'X'))?.winner === 'X') {
+          score -= 20;
+          break;
+        }
+      }
+    }
+
+    // Build O's threats (lines with O pieces and no X pieces)
     for (const line of WIN_LINES) {
       const inLine = line.some(([r, c]) => r === cell.row && c === cell.col);
       if (!inLine) continue;
-      const xCount = line.filter(([r, c]) => state.board[r][c]?.player === 'X').length;
-      const emptyCount = line.filter(([r, c]) => !state.board[r][c]).length;
-      if (xCount > 0 && xCount + emptyCount === 3) threat++;
+      const oCount = line.filter(([r, c]) =>
+        !state.board[r][c]?.revealed && state.board[r][c]?.player === 'O'
+      ).length;
+      const xBlocks = line.some(([r, c]) =>
+        !state.board[r][c]?.revealed && state.board[r][c]?.player === 'X'
+      );
+      if (!xBlocks && oCount > 0) score += oCount * 2;
     }
-    return { cell, threat };
+
+    return { cell, score };
   });
-  scored.sort((a, b) => b.threat - a.threat);
-  const best = scored[0];
-  if (best.threat > 0) return pickRandom(best.cell);
 
-  const center = candidates.find(m => m.row === 1 && m.col === 1);
-  if (center) return pickRandom(center);
-
-  const corners = candidates.filter(m => (m.row === 0 || m.row === 2) && (m.col === 0 || m.col === 2));
-  if (corners.length > 0) return pickRandom(corners[Math.floor(Math.random() * corners.length)]);
-
-  return pickRandom(candidates[Math.floor(Math.random() * candidates.length)]);
+  scored.sort((a, b) => b.score - a.score);
+  return pickRandom(scored[0].cell);
 }
 
 // ---------------------------------------------------------------------------
@@ -189,6 +227,36 @@ function applyMove(state: TicTacToeState, row: number, col: number, driverId: st
     winLine: winResult ? winResult.line : null,
     aiThinking: false,
     shakeCell: null,
+    wrongStreak: null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Apply a reveal (neutral — neither player scores the cell)
+// ---------------------------------------------------------------------------
+function applyReveal(state: TicTacToeState, row: number, col: number, driverId: string): TicTacToeState {
+  const newBoard = state.board.map((r, ri) =>
+    r.map((c, ci) =>
+      ri === row && ci === col
+        ? { player: state.currentPlayer, driverId, revealed: true }
+        : c
+    )
+  );
+  const newUsed = new Set(state.usedDriverIds);
+  newUsed.add(driverId);
+  const winResult = checkWinner(newBoard as (CellEntry | null)[][]);
+  const full = boardFull(newBoard as (CellEntry | null)[][]);
+
+  return {
+    ...state,
+    board: newBoard as (CellEntry | null)[][],
+    usedDriverIds: newUsed,
+    currentPlayer: state.currentPlayer === 'X' ? 'O' : 'X',
+    winner: winResult ? winResult.winner : full ? 'draw' : null,
+    winLine: winResult ? winResult.line : null,
+    aiThinking: false,
+    shakeCell: null,
+    wrongStreak: null,
   };
 }
 
@@ -204,7 +272,6 @@ export default function GameContainer() {
   const [tttState, setTttState] = useState<TicTacToeState | null>(null);
   const shakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Refs for stable callbacks — always reflect latest state without recreating functions
   const gameDataRef = useRef<GameData | null>(null);
   const tttStateRef = useRef<TicTacToeState | null>(null);
   gameDataRef.current = gameData;
@@ -239,10 +306,8 @@ export default function GameContainer() {
     if (tttState.currentPlayer !== 'O') return;
     if (tttState.aiThinking) return;
 
-    // Snapshot for the closure
     const snap = tttState;
     const grid = gameData.grid;
-
     setTttState(prev => prev ? { ...prev, aiThinking: true } : prev);
 
     aiTimerRef.current = setTimeout(() => {
@@ -251,10 +316,7 @@ export default function GameContainer() {
         setTttState(prev => {
           if (!prev) return prev;
           if (prev.winner !== null) return { ...prev, aiThinking: false };
-          if (!move) {
-            // No valid cell for AI — pass turn back to player
-            return { ...prev, aiThinking: false, currentPlayer: 'X' };
-          }
+          if (!move) return { ...prev, aiThinking: false, currentPlayer: 'X' };
           return applyMove(prev, move.row, move.col, move.driverId);
         });
       } catch (err) {
@@ -263,10 +325,7 @@ export default function GameContainer() {
       }
     }, 1200);
 
-    return () => {
-      if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
-    };
-  // aiThinking intentionally omitted: including it would cancel the timeout it sets
+    return () => { if (aiTimerRef.current) clearTimeout(aiTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tttState?.currentPlayer, tttState?.winner, tttState?.mode]);
 
@@ -276,17 +335,12 @@ export default function GameContainer() {
     gridDifficulty: GridDifficulty = 'medium'
   ) => {
     if (!gameData) return;
-    // Cancel any pending timers from previous game
     if (shakeTimerRef.current) clearTimeout(shakeTimerRef.current);
     if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
 
     const driversMap = new Map<string, DriverProfile>(
       gameData.driverProfiles.map(p => [p.id, p])
     );
-
-    // Debug: log Alonso's profile to verify constructor + raceWinner data
-    const alonso = gameData.driverProfiles.find(p => p.id === 'alonso');
-    if (alonso) console.log('[F1] Alonso profile:', JSON.stringify(alonso));
 
     let newGrid = gameData.grid;
     try {
@@ -296,9 +350,7 @@ export default function GameContainer() {
     }
     setGameData(prev => prev ? { ...prev, grid: newGrid } : prev);
     setTttState({
-      mode,
-      aiDifficulty,
-      gridDifficulty,
+      mode, aiDifficulty, gridDifficulty,
       board: emptyBoard(),
       currentPlayer: 'X',
       usedDriverIds: new Set(),
@@ -306,6 +358,7 @@ export default function GameContainer() {
       winLine: null,
       aiThinking: false,
       shakeCell: null,
+      wrongStreak: null,
     });
     setPhase('playing');
   }, [gameData]);
@@ -326,9 +379,12 @@ export default function GameContainer() {
         return applyMove(prev, row, col, driverId);
       });
     } else {
-      // Wrong answer — shake cell, lose turn
+      const prevStreak = tttState.wrongStreak;
+      const sameCell = prevStreak?.cell[0] === row && prevStreak?.cell[1] === col;
+      const newStreak = { cell: [row, col] as [number, number], count: sameCell ? prevStreak!.count + 1 : 1 };
+
       if (shakeTimerRef.current) clearTimeout(shakeTimerRef.current);
-      setTttState(prev => prev ? { ...prev, shakeCell: [row, col] } : prev);
+      setTttState(prev => prev ? { ...prev, shakeCell: [row, col], wrongStreak: newStreak } : prev);
       shakeTimerRef.current = setTimeout(() => {
         setTttState(prev => {
           if (!prev) return prev;
@@ -336,6 +392,25 @@ export default function GameContainer() {
         });
       }, 650);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleReveal = useCallback((row: number, col: number) => {
+    const gameData = gameDataRef.current;
+    const tttState = tttStateRef.current;
+    if (!gameData || !tttState) return;
+    if (tttState.winner !== null) return;
+    if (tttState.board[row]?.[col]) return;
+
+    const validIds = gameData.grid.cells[row]?.[col]?.validDriverIds ?? [];
+    const unusedValid = validIds.filter(id => !tttState.usedDriverIds.has(id));
+    if (unusedValid.length === 0) return;
+
+    const driverId = unusedValid[0];
+    setTttState(prev => {
+      if (!prev || prev.winner !== null || prev.board[row]?.[col]) return prev;
+      return applyReveal(prev, row, col, driverId);
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -374,6 +449,7 @@ export default function GameContainer() {
       gameData={gameData}
       tttState={tttState}
       onAnswer={handleAnswer}
+      onReveal={handleReveal}
       onNewGame={handleNewGame}
     />
   );
